@@ -1,0 +1,8 @@
+### gitignore ###
+
+*.pyc
+stockctl.py
+__pycache__/
+
+log/*.*
+temp/*.*

@@ -292,9 +292,9 @@ class PrestaRequest:
             return get_stock_content.status_code
 
 
-    def warehouse_quantity_mgmt(self, reference, delete=True, request_url=None):
+    def warehouse_quantity_mgmt(self, warehouse, reference, delete=True, request_url=None):
         if request_url == None:
-            request_url = self.stock_control(warehouse='shop', reference=reference)
+            request_url = self.stock_control(warehouse=warehouse, reference=reference)
 
         if not delete:
             mgmt_var = 1

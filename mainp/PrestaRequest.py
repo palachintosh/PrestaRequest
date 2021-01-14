@@ -252,8 +252,10 @@ class PrestaRequest:
                     w_id = general_product.find('id_warehouse').text
 
                     if w_id == warehouses.get(warehouse.lower()):
-                        return link
-                    
+                        self.warehouse_stock_link = link
+                        
+                        return self.warehouse_stock_link
+
 
         
         else:
@@ -279,7 +281,7 @@ class PrestaRequest:
                 get_stock_url = general_product.findall('stock')
                 response_data = []
 
-                if len(get_stock_url) > 1:
+                if len(get_stock_url) >= 1:
                     for i in get_stock_url:
                         response_data.append(i.get('{http://www.w3.org/1999/xlink}href'))
                     
@@ -342,7 +344,7 @@ class PrestaRequest:
 
             self._loging(kwargs=data)
 
-            return True
+            return request_url
 
         else:
             return None

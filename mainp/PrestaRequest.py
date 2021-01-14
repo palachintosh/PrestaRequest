@@ -212,7 +212,7 @@ class PrestaRequest:
         
         if response_data == None:
             try:
-                with open('../temp/log.xml') as file:
+                with open(os.path.join(self.base_dir, 'temp/log.xml')) as file:
                     response_data = file.read()
             except FileNotFoundError as e:
                 return e

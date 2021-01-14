@@ -218,7 +218,7 @@ class PrestaRequest:
                 return e
 
         headers = {
-            'Authorization': 'Basic ' + self.api_secret_key_64,
+            'Authorization': 'Basic ' + self.api_secret_key_64.decode(),
             'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:69.0) Gecko/20100101 Firefox/69.0',
             'referer': 'https://3gravity.pl/',
         }

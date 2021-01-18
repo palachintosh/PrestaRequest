@@ -15,7 +15,8 @@ import datetime
 
 class PrestaRequest:
     
-    """ Constructor takes follow parametrs:
+    """ 
+        Constructor takes follow parametrs:
         request_url: link of product that you want to change,
         new_text_value: the value you want to set up,
     """
@@ -39,14 +40,14 @@ class PrestaRequest:
 
 
     def _xml_data_extractor(self, data, tag=None, **kwargs):
-        
         if tag == None:
             kwargs_dict = kwargs.get('kwargs')
-        
+            tag = kwargs_dict.get('tag')
+
         try:
             xml_content = ET.fromstring(data.content)  # Create ET instanse and root tag
             general_tag = xml_content[0]  # Get prestashop tag
-            tag = general_tag.find(kwargs_dict.get('tag'))
+            tag = general_tag.find(tag)
             tag_inner_link = tag.get('{http://www.w3.org/1999/xlink}href')
 
             return tag_inner_link
@@ -55,7 +56,7 @@ class PrestaRequest:
             return None
 
 
-    def _loging(self, **kwargs):
+    def _logging(self, **kwargs):
         kwargs = kwargs.get('kwargs')
 
         # Check file
@@ -73,7 +74,36 @@ class PrestaRequest:
         except Exception as e:
             return e
     
-    
+
+    #warehouse_detect
+    def _wd(self, warehouse, data):
+
+        warehouses = {
+            'shop': '4',
+            'x': '5',
+            'y': '6'
+        }
+
+        if type(data) == list:
+            for link in data:
+                get_warehouse_id = requests.get(str(link), auth=(self.api_secret_key, ''))
+                
+                if get_warehouse_id.status_code == 200:
+                    xml_content = ET.fromstring(get_warehouse_id.content)
+                    general_product = xml_content[0]
+                    w_id = general_product.find('id_warehouse').text
+
+                    if w_id == warehouses.get(warehouse.lower()):
+                        self.warehouse_stock_link = link
+                        
+                        return self.warehouse_stock_link
+
+
+        
+        else:
+            raise TypeError()
+
+
     # Private methods here ++++++++++++++++++++++++++++++++
 
 
@@ -125,10 +155,12 @@ class PrestaRequest:
 
     def get_product_stocks_url(self, request_url=None):
         
-        if request_url != None:
-            get_product_link = request_url
-        else:
+        # If request_url eq. None - get request_url from get_product_url
+        get_product_link = request_url
+        
+        if request_url == None:
             get_product_link = self.get_product_url()
+            
 
         stock_data = []
 
@@ -138,46 +170,70 @@ class PrestaRequest:
 
             if product_page.status_code == 200:
 
+                # In product page stock_availables is in 'associatins' block 
                 xml_content = ET.fromstring(product_page.content)
+                # Get general tag for stock_availables
                 general_tag = xml_content[0].find('associations')
+                # Get stock_availables tag directly
                 get_stock_tag = general_tag.find('stock_availables')
 
+                # Try to find all tags inside stock_availables and
+                # extract each node link
                 for i in get_stock_tag.findall('stock_available'):
                     stock_data.append(i.get('{http://www.w3.org/1999/xlink}href'))
                 
+                # Return list with links if all right
                 return stock_data
+
             else:
+                #return status code if code another than 200
                 return product_page.status_code
 
+        # Return None if request failed
         else:
             return None
 
 
-    def stock_parser(self, stock_list=None):
+    def stock_parser(self, delete=True, stock_list=None):
+        mgmt_var = -1
 
+        # Check if stock_list has anything
+        # If not - get stock link from func
         if stock_list == None:
             stock_list = self.get_product_stocks_url()
+        
+        # If true, than increment quantity
+        if not delete:
+            mgmt_var = 1
 
         if len(stock_list) != 0:
 
-            # Stock parsing
+            # Stocks parsing
             for i in stock_list:
                 stock_page = requests.get(i, auth=(self.api_secret_key, ''))
                 
                 if stock_page.status_code == 200:
                     xml_content = ET.fromstring(stock_page.content)
+
+                    # Get total quantity from stock_availables
                     self.quantity = xml_content[0].find('quantity').text
+                    # Get product atribute
                     combination_link = xml_content[0].find('id_product_attribute')
+                    # Get product id
                     id_product = xml_content[0].find('id_product').text
 
                     print(self.get_combination_link, " / ", combination_link.get('{http://www.w3.org/1999/xlink}href'))
 
+                    # Varify product
+                    # If global combination link and combination link from product card are eq.
+                    # Than write global self.stock_url for future PUT request
+                    # and decrease general quantity
                     if self.get_combination_link == combination_link.get('{http://www.w3.org/1999/xlink}href'):
                         self.stock_url = str(i)
                         print("Product with id {} will be delete! Total quantity: {}".format(id_product, self.quantity))
 
-                        if self.xml_response_create(new_quantity=int(self.quantity) - 1):
-                            return(int(self.quantity) - 1)
+                        if self.xml_response_create(new_quantity=int(self.quantity) + mgmt_var):
+                            return(int(self.quantity) - mgmt_var)
                     else:
                         print("Product id: {}.".format(id_product), int(self.quantity), combination_link)
                 else:
@@ -233,35 +289,6 @@ class PrestaRequest:
             return update_stocks.content
 
 
-    #warehouse_detect
-    def _wd(self, warehouse, data):
-
-        warehouses = {
-            'shop': '4',
-            'x': '5',
-            'y': '6'
-        }
-
-        if type(data) == list:
-            for link in data:
-                get_warehouse_id = requests.get(str(link), auth=(self.api_secret_key, ''))
-                
-                if get_warehouse_id.status_code == 200:
-                    xml_content = ET.fromstring(get_warehouse_id.content)
-                    general_product = xml_content[0]
-                    w_id = general_product.find('id_warehouse').text
-
-                    if w_id == warehouses.get(warehouse.lower()):
-                        self.warehouse_stock_link = link
-                        
-                        return self.warehouse_stock_link
-
-
-        
-        else:
-            raise TypeError()
-
-
     # The func try to find stock url from urlpattern: ['https://3gravity.pl/api/stocks/?filter[reference]=KRHT..']
     # in warehouses
     # and return the stock link if product exists
@@ -298,6 +325,7 @@ class PrestaRequest:
         if request_url == None:
             request_url = self.stock_control(warehouse=warehouse, reference=reference)
 
+        # Add or delete product
         if not delete:
             mgmt_var = 1
         
@@ -310,6 +338,7 @@ class PrestaRequest:
         if get_stocks_content.status_code == 200:
             # Make ET object from XML content from rqeuest
             xml_content = ET.fromstring(get_stocks_content.content)
+            
             # Get general tag from API page. For example,  in "https://domain_name.com/api/stocks/1"
             # the first tag (in prestashop continer) will be 'stock'
             general_product = xml_content[0]
@@ -342,13 +371,10 @@ class PrestaRequest:
                 'global_quantity': self.global_quantity,
             }
 
-            self._loging(kwargs=data)
+            self._logging(kwargs=data)
 
             return request_url
 
         else:
             return None
 
-
-
-#  'stocks' => array('description' => 'Stocks', 'class' => 'Stock', 'forbidden_method' => array('PUT', 'POST', 'DELETE')),

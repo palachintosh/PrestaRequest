@@ -10,7 +10,7 @@ import datetime
 """ 
     PrestaRequest main class for monitoring and actualization products barcode and QR.
     Class contains standart methods for works with PrestaShop API.
-    Require lib: xml.etree, requests.
+    Requirements: xml.etree, requests.
 """
 
 class PrestaRequest:
@@ -59,9 +59,15 @@ class PrestaRequest:
     def _logging(self, **kwargs):
         kwargs = kwargs.get('kwargs')
 
+        if kwargs.get('name') != None:
+            name = kwargs.pop('name')
+        else:
+            name = "log.txt"
+
+
         # Check file
-        if not os.path.exists(os.path.join(self.base_dir, 'log/log.txt')):
-            f = open(os.path.join(self.base_dir, 'log/log.txt'), "w")
+        if not os.path.exists(os.path.join(self.base_dir, 'log/' + name)):
+            f = open(os.path.join(self.base_dir, 'log/' + name), "w")
             f.close()
 
         # if exists
@@ -69,7 +75,7 @@ class PrestaRequest:
             for i in kwargs.items():
                 writable_data = "{}: {}".format(datetime.datetime.now(), i)
 
-                with open(os.path.join(self.base_dir, 'log/log.txt'), "a", encoding="UTF-8") as f:
+                with open(os.path.join(self.base_dir, 'log/' + name), "a", encoding="UTF-8") as f:
                     print(writable_data, file=f)
         except Exception as e:
             return e
@@ -150,7 +156,7 @@ class PrestaRequest:
                 return get_product_link_from_comb.status_code
         
         else:
-            return "Product does not exist: {}".format(request_url)
+            return "Product does not exist: {}".format(get_combination_link)
 
 
     def get_product_stocks_url(self, request_url=None):
@@ -282,14 +288,14 @@ class PrestaRequest:
         update_stocks = requests.put(request_url, headers=headers, data=response_data)
 
         if update_stocks.status_code == 200:
-            return "All data has been updated!"
+            return {'success': 'All data has been updated!'}
         
         else:
             print(update_stocks.status_code)
             return update_stocks.content
 
 
-    # The func try to find stock url from urlpattern: ['https://3gravity.pl/api/stocks/?filter[reference]=KRHT..']
+    # The func try to find stock url from urlpattern: ['https://domain.com/api/stocks/?filter[reference]=KRHT..']
     # in warehouses
     # and return the stock link if product exists
     # or "Product does not exist!" str if not.
@@ -321,18 +327,37 @@ class PrestaRequest:
             return get_stock_content.status_code
 
 
-    def warehouse_quantity_mgmt(self, warehouse, reference, delete=True, request_url=None):
+    def warehouse_quantity_mgmt(self, warehouse, reference, quantity_to_transfer=None, delete=True, request_url=None):
         if request_url == None:
             request_url = self.stock_control(warehouse=warehouse, reference=reference)
 
         # Add or delete product
-        if not delete:
-            mgmt_var = 1
+
+        # if not delete:
+        #     mgmt_var = 1
+
+        # else:
+        #     mgmt_var = -1
+        
+
+        if quantity_to_transfer == None and delete:
+            mgmt_var = -1
+            print("first_case", mgmt_var)
+
+        elif quantity_to_transfer is not None and delete:
+            mgmt_var =  0 - int(quantity_to_transfer)
+            print("second_case", mgmt_var)
+
+        elif quantity_to_transfer is not None and not delete:
+            mgmt_var = int(quantity_to_transfer)
+            print("third_case", mgmt_var)
         
         else:
-            mgmt_var = -1
-        
-        
+            return None
+
+
+
+
         get_stocks_content = requests.get(request_url, auth=(self.api_secret_key, ''))
 
         if get_stocks_content.status_code == 200:
@@ -346,16 +371,23 @@ class PrestaRequest:
             # Get warehouse quantity and remove one
             get_physical_quantity = general_product.find('physical_quantity')
             get_usable_quantity = general_product.find('usable_quantity')
-            get_physical_quantity.text = str(int(get_physical_quantity.text) + mgmt_var)
-            get_usable_quantity.text = str(int(get_usable_quantity.text) + mgmt_var)
+
+            if int(get_physical_quantity.text) + int(quantity_to_transfer) >= 0:
+
+                get_physical_quantity.text = str(int(get_physical_quantity.text) + mgmt_var)
+                get_usable_quantity.text = str(int(get_usable_quantity.text) + mgmt_var)
+
+            else:
+                return {'error': 'Unable to delete products! Total quantity is less than 0.'}
             
+
             # Remove not filterable field for PUT request
             get_not_filterable_fields = general_product.find('real_quantity')
             general_product.remove(get_not_filterable_fields)
 
             
             # Write global_quantity for controlling summary quantity
-            self.global_quantity = [get_physical_quantity.text, get_usable_quantity.text]
+            self.global_quantity = [int(get_physical_quantity.text), int(get_usable_quantity.text)]
 
 
             # Convert element object in ElementTree
@@ -364,17 +396,88 @@ class PrestaRequest:
             # Write XML for PUT request
             format_xml_tree.write(os.path.join(self.base_dir, 'temp/log.xml'))
 
-            # with open(os.path.join(log_path, 'temp/log.xml')) as file:
-            #     data = file.read()
-
             data = {
-                'global_quantity': self.global_quantity,
+                'name': 'log.txt',
+                'PQ': get_physical_quantity.text,
+                'UQ': get_usable_quantity.text,
+                'RQ': get_not_filterable_fields.text
             }
 
             self._logging(kwargs=data)
+            return request_url
 
+        else:
+            return None
+    
+    # Return phisical and usable quantity of product
+    def _warehouse_q_get(self, request_url):
+        get_stocks_content = requests.get(request_url, auth=(self.api_secret_key, ''))
+
+        if get_stocks_content.status_code == 200:
+            # Make ET object from XML content from rqeuest
+            xml_content = ET.fromstring(get_stocks_content.content)
+            general_product = xml_content[0]
+
+            get_physical_quantity = int(general_product.find('physical_quantity').text)
+            get_usable_quantity = int(general_product.find('usable_quantity').text)
+            get_real_q = int(general_product.find('real_quantity').text)
+     
+            # Write global_quantity for controlling summary quantity
+            self.global_quantity = [get_physical_quantity, get_usable_quantity]
+
+            data = {
+                'name': 'transfer_log.txt',
+                'PQ': get_physical_quantity,
+                'UQ': get_usable_quantity,
+                'RQ': get_real_q
+            }
+
+            self._logging(kwargs=data)
             return request_url
 
         else:
             return None
 
+
+    # Method for products transferring
+
+    def product_transfer(self, quantity_to_transfer, w_from, w_to, code, request_url=None):
+        
+        request_url_from = self.stock_control(warehouse=w_from, reference=code)
+        request_url_to = self.stock_control(warehouse=w_to, reference=code)
+
+        if request_url_from and request_url_to:
+            get_from_q = self.warehouse_quantity_mgmt(
+                warehouse=None,
+                quantity_to_transfer=quantity_to_transfer,
+                reference=None,
+                request_url=request_url_from)
+
+            # if get_from_q != None and self.global_quantity[0] - quantity_to_transfer >= 0:
+            if get_from_q != None:
+                
+                # Make a put request!
+                update_quantity = self.presta_put(request_url=get_from_q)
+                # update_quantity = {'success': '-'}
+
+                if update_quantity.get('success') != None:
+                    
+                    # Update 'TO' warehouse
+                    get_to_q = self.warehouse_quantity_mgmt(
+                        quantity_to_transfer=quantity_to_transfer,
+                        warehouse=w_to,
+                        reference=None,
+                        delete=False,
+                        request_url=request_url_to)
+
+                    if get_to_q != None:
+                        # update_quantity = {'success': '-'}
+                        update_quantity = self.presta_put(request_url=get_to_q)
+
+                        if update_quantity.get('success') != None:
+                            return {'success': 'All data has been updated!'}
+
+        else:
+            return (request_url_from, request_url_to)
+
+    

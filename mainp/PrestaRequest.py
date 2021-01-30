@@ -478,6 +478,6 @@ class PrestaRequest:
                             return {'success': 'All data has been updated!'}
 
         else:
-            return (request_url_from, request_url_to)
+            return {'from': request_url_from, 'to': request_url_to}
 
     

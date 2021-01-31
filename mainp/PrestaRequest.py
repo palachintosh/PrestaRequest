@@ -35,6 +35,13 @@ class PrestaRequest:
         self.request_url = request_url
         self.kwargs = kwargs.items()
 
+        #product meta to return
+        self.name = None
+        self.total_quantity = None
+        self.w_from = None
+        self.w_to = None
+        self.date = str(datetime.datetime.now().strftime("%d-%m-%Y, %H:%M"))
+
 
     # Private methods here ++++++++++++++++++++++++++++++++
 
@@ -50,7 +57,11 @@ class PrestaRequest:
             tag = general_tag.find(tag)
             tag_inner_link = tag.get('{http://www.w3.org/1999/xlink}href')
 
-            return tag_inner_link
+            # return tag_inner_link
+            product_meta = {
+                'product_link': tag_inner_link
+            }
+            return product_meta
 
         except:
             return None
@@ -104,8 +115,6 @@ class PrestaRequest:
                         
                         return self.warehouse_stock_link
 
-
-        
         else:
             raise TypeError()
 
@@ -121,9 +130,11 @@ class PrestaRequest:
         if get_combination_xml.status_code == 200:
             try:
                 request_data = {'tag': 'combination'}
-                self.get_combination_link = self._xml_data_extractor(
+                get_combination_data = self._xml_data_extractor(
                     data=get_combination_xml,
                     kwargs=request_data)
+                self.get_combination_link = get_combination_data.get('product_link')
+                print(self.get_combination_link)
                 
                 if self.get_combination_link != None:
 
@@ -136,8 +147,11 @@ class PrestaRequest:
     # Get product link from combination page
     def get_product_url(self, request_url=None):
         
+        print(request_url)
         if request_url == None:
             get_combination_link = self.get_combination_url()
+        else:
+            get_combination_link = request_url
         
         if get_combination_link:
 
@@ -150,7 +164,7 @@ class PrestaRequest:
                     kwargs=request_data)
                 
                 if product_url != None:
-                    return product_url
+                    return product_url.get('product_link')
                 
             else:
                 return get_product_link_from_comb.status_code
@@ -166,7 +180,6 @@ class PrestaRequest:
         
         if request_url == None:
             get_product_link = self.get_product_url()
-            
 
         stock_data = []
 
@@ -188,8 +201,19 @@ class PrestaRequest:
                 for i in get_stock_tag.findall('stock_available'):
                     stock_data.append(i.get('{http://www.w3.org/1999/xlink}href'))
                 
+                name = xml_content[0].find('name')
+                self.name = name.find('language').text
+
+                product_data = {
+                    'name': self.name,
+                    'date': self.date,
+                    'stock_data': stock_data
+                }
+
+
                 # Return list with links if all right
-                return stock_data
+                # return stock_data
+                return product_data
 
             else:
                 #return status code if code another than 200
@@ -205,7 +229,7 @@ class PrestaRequest:
         # Check if stock_list has anything
         # If not - get stock link from func
         if stock_list == None:
-            stock_list = self.get_product_stocks_url()
+            stock_list = self.get_product_stocks_url().get('stock_data')
         
         # If true, than increment quantity
         if not delete:
@@ -356,6 +380,7 @@ class PrestaRequest:
         else:
             return None
 
+        self.total_quantity = quantity_to_transfer
 
 
 
@@ -476,7 +501,18 @@ class PrestaRequest:
                         update_quantity = self.presta_put(request_url=get_to_q)
 
                         if update_quantity.get('success') != None:
-                            return {'success': 'All data has been updated!'}
+                            self.w_from = w_from
+                            self.w_to = w_to
+
+                            response_data = {
+                                'success': 'YES',
+                                'name': self.name,
+                                'quantity': self.total_quantity,
+                                'w_from': self.w_from,
+                                'w_to': self.w_to,
+                                'date': self.date
+                            }
+                            return response_data
 
         else:
             return {'from': request_url_from, 'to': request_url_to}
@@ -513,8 +549,18 @@ class PrestaRequest:
 
 
         if add_bikes != None and update_warehouse != None:
-            return {'success': 'All data has been updated!'}
+            self.w_to = w_to
+            
+            response_data = {
+                'success': 'YES',
+                'name': self.name,
+                'quantity': self.total_quantity,
+                'w_from': self.w_from,
+                'w_to': self.w_to,
+                'date': self.date
+            }
 
+            return response_data
 
         else:
-            return {'to': 'None'}
+            return {'error': 'None'}

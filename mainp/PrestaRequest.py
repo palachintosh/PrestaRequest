@@ -200,8 +200,7 @@ class PrestaRequest:
             return None
 
 
-    def stock_parser(self, delete=True, stock_list=None):
-        mgmt_var = -1
+    def stock_parser(self, quantity_to_transfer, delete=True, stock_list=None):
 
         # Check if stock_list has anything
         # If not - get stock link from func
@@ -210,7 +209,9 @@ class PrestaRequest:
         
         # If true, than increment quantity
         if not delete:
-            mgmt_var = 1
+            mgmt_var = quantity_to_transfer
+        else:
+            mgmt_var = -1
 
         if len(stock_list) != 0:
 
@@ -239,7 +240,7 @@ class PrestaRequest:
                         print("Product with id {} will be delete! Total quantity: {}".format(id_product, self.quantity))
 
                         if self.xml_response_create(new_quantity=int(self.quantity) + mgmt_var):
-                            return(int(self.quantity) - mgmt_var)
+                            return(int(self.quantity) + mgmt_var)
                     else:
                         print("Product id: {}.".format(id_product), int(self.quantity), combination_link)
                 else:
@@ -292,7 +293,7 @@ class PrestaRequest:
         
         else:
             print(update_stocks.status_code)
-            return update_stocks.content
+            return {'error': update_stocks.status_code}
 
 
     # The func try to find stock url from urlpattern: ['https://domain.com/api/stocks/?filter[reference]=KRHT..']
@@ -480,4 +481,40 @@ class PrestaRequest:
         else:
             return {'from': request_url_from, 'to': request_url_to}
 
-    
+
+
+    def to_w_transfer(self, quantity_to_transfer, w_to, code):
+
+        self.request_url = 'https://3gravity.pl/api/combinations/?filter[reference]={}'.format(code)
+
+        # Get link product on warehouse
+        request_url_to = self.stock_control(warehouse=w_to, reference=code)
+        
+        stock_parser = self.stock_parser(
+                                        quantity_to_transfer,
+                                        delete=False)
+        
+        if stock_parser:
+            add_bikes = self.presta_put()
+
+            if request_url_to and add_bikes != None:
+                get_to_q = self.warehouse_quantity_mgmt(
+                    warehouse=None,
+                    quantity_to_transfer=quantity_to_transfer,
+                    reference=None,
+                    request_url=request_url_to,
+                    delete=False
+                    )
+                
+                print(get_to_q)
+
+                if get_to_q:
+                    update_warehouse = self.presta_put(request_url=get_to_q)
+
+
+        if add_bikes != None and update_warehouse != None:
+            return {'success': 'All data has been updated!'}
+
+
+        else:
+            return {'to': 'None'}

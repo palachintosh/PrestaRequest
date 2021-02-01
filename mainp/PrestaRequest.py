@@ -415,7 +415,7 @@ class PrestaRequest:
             get_physical_quantity = general_product.find('physical_quantity')
             get_usable_quantity = general_product.find('usable_quantity')
 
-            if int(get_physical_quantity.text) + mgmt_var >= 0:
+            if (int(get_physical_quantity.text) + mgmt_var) >= 0:
 
                 get_physical_quantity.text = str(int(get_physical_quantity.text) + mgmt_var)
                 get_usable_quantity.text = str(int(get_usable_quantity.text) + mgmt_var)
@@ -572,11 +572,11 @@ class PrestaRequest:
             
             response_data = {
                 'success': 'YES',
-                'name': self.name,
-                'quantity': self.total_quantity,
-                'w_from': self.w_from,
-                'w_to': self.w_to,
-                'date': self.date
+                'name': str(self.name),
+                'quantity': str(self.total_quantity),
+                'w_from': str(self.w_from),
+                'w_to': str(self.w_to),
+                'date': str(self.date)
             }
 
             return response_data

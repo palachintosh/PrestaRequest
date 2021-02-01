@@ -397,7 +397,7 @@ class PrestaRequest:
         else:
             return None
 
-        self.total_quantity = quantity_to_transfer
+        self.total_quantity = abs(mgmt_var)
 
 
 
@@ -415,7 +415,7 @@ class PrestaRequest:
             get_physical_quantity = general_product.find('physical_quantity')
             get_usable_quantity = general_product.find('usable_quantity')
 
-            if int(get_physical_quantity.text) + int(quantity_to_transfer) >= 0:
+            if int(get_physical_quantity.text) + mgmt_var >= 0:
 
                 get_physical_quantity.text = str(int(get_physical_quantity.text) + mgmt_var)
                 get_usable_quantity.text = str(int(get_usable_quantity.text) + mgmt_var)

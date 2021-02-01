@@ -262,6 +262,7 @@ class PrestaRequest:
 
                     # Get total quantity from stock_availables
                     self.quantity = xml_content[0].find('quantity').text
+                    print("QUANTITY: ", self.quantity)
                     # Get product atribute
                     combination_link = xml_content[0].find('id_product_attribute')
                     # Get product id

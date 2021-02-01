@@ -371,7 +371,7 @@ class PrestaRequest:
             request_url = self.stock_control(warehouse=warehouse, reference=reference)
 
             if request_url == "Product does not exist!":
-                
+                return {'error': request_url}
         # Add or delete product
 
         # if not delete:

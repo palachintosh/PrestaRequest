@@ -147,7 +147,6 @@ class PrestaRequest:
     # Get product link from combination page
     def get_product_url(self, request_url=None):
         
-        print(request_url)
         if request_url == None:
             get_combination_link = self.get_combination_url()
         else:
@@ -170,7 +169,7 @@ class PrestaRequest:
                 return get_product_link_from_comb.status_code
         
         else:
-            return "Product does not exist: {}".format(get_combination_link)
+            return {'error': 'Product does not exit in the stocks!'}
 
 
     def get_product_stocks_url(self, request_url=None):
@@ -180,11 +179,21 @@ class PrestaRequest:
         
         if request_url == None:
             get_product_link = self.get_product_url()
+            try:
+                str(get_product_link)
+            except:
+                get_product_link.get('error')
+                response_data = {
+                    'error': get_product_link.get('error')
+                }
+                
+                return response_data
+
 
         stock_data = []
 
         # Stock finding
-        if get_product_link:
+        if type(get_product_link) is str:
             product_page = requests.get(get_product_link, auth=(self.api_secret_key, ''))
 
             if product_page.status_code == 200:
@@ -229,7 +238,12 @@ class PrestaRequest:
         # Check if stock_list has anything
         # If not - get stock link from func
         if stock_list == None:
-            stock_list = self.get_product_stocks_url().get('stock_data')
+            stock_list = self.get_product_stocks_url()
+            if stock_list != None:
+                stock_list = stock_list.get('stock_data')
+            else:
+                return None
+            
         
         # If true, than increment quantity
         if not delete:
@@ -356,6 +370,8 @@ class PrestaRequest:
         if request_url == None:
             request_url = self.stock_control(warehouse=warehouse, reference=reference)
 
+            if request_url == "Product does not exist!":
+                
         # Add or delete product
 
         # if not delete:
@@ -434,7 +450,8 @@ class PrestaRequest:
 
         else:
             return None
-    
+
+
     # Return phisical and usable quantity of product
     def _warehouse_q_get(self, request_url):
         get_stocks_content = requests.get(request_url, auth=(self.api_secret_key, ''))
@@ -466,7 +483,6 @@ class PrestaRequest:
 
 
     # Method for products transferring
-
     def product_transfer(self, quantity_to_transfer, w_from, w_to, code, request_url=None):
         
         request_url_from = self.stock_control(warehouse=w_from, reference=code)
@@ -521,6 +537,8 @@ class PrestaRequest:
 
     def to_w_transfer(self, quantity_to_transfer, w_to, code):
 
+        update_warehouse = None
+        add_bikes = None
         self.request_url = 'https://3gravity.pl/api/combinations/?filter[reference]={}'.format(code)
 
         # Get link product on warehouse
@@ -563,4 +581,4 @@ class PrestaRequest:
             return response_data
 
         else:
-            return {'error': 'None'}
+            return {'error': 'Unable to mooving products!'}

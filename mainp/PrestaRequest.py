@@ -532,7 +532,9 @@ class PrestaRequest:
                             return response_data
 
         else:
-            return {'from': request_url_from, 'to': request_url_to}
+            error_msg = 'Product with this code was not found on the stocks! From: {}, TO: {}'.format(w_from, w_to)
+            
+            return {'error': error_msg}
 
 
 

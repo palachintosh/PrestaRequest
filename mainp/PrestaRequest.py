@@ -496,6 +496,10 @@ class PrestaRequest:
                 reference=None,
                 request_url=request_url_from)
 
+            if get_from_q is dict:
+                if get_from_q.get('error'):
+                    return get_from_q
+
             # if get_from_q != None and self.global_quantity[0] - quantity_to_transfer >= 0:
             if get_from_q != None:
                 

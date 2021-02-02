@@ -496,7 +496,7 @@ class PrestaRequest:
                 reference=None,
                 request_url=request_url_from)
 
-            if get_from_q is dict:
+            if type(get_from_q) is dict:
                 if get_from_q.get('error'):
                     return get_from_q
 

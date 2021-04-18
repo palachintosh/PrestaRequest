@@ -43,6 +43,12 @@ class PrestaRequest:
         self.date = str(datetime.datetime.now().strftime("%d-%m-%Y, %H:%M"))
 
 
+        self.warehouses = {
+            'shop': '4',
+            'x': '5',
+            'y': '6'
+        }
+
     # Private methods here ++++++++++++++++++++++++++++++++
 
 
@@ -95,11 +101,11 @@ class PrestaRequest:
     #warehouse_detect
     def _wd(self, warehouse, data):
 
-        warehouses = {
-            'shop': '4',
-            'x': '5',
-            'y': '6'
-        }
+        # warehouses = {
+        #     'shop': '4',
+        #     'x': '5',
+        #     'y': '6'
+        # }
 
         if type(data) == list:
             for link in data:
@@ -110,7 +116,7 @@ class PrestaRequest:
                     general_product = xml_content[0]
                     w_id = general_product.find('id_warehouse').text
 
-                    if w_id == warehouses.get(warehouse.lower()):
+                    if w_id == self.warehouses.get(warehouse.lower()):
                         self.warehouse_stock_link = link
                         
                         return self.warehouse_stock_link

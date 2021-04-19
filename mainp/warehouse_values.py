@@ -5,10 +5,10 @@ from xml.etree import ElementTree as ET
 
 class GetWarehousesValues(PrestaRequest):
 
-    warehouses = {
-            '4': 'shop',
-            '5': 'x',
-            '6': 'y'
+    name_warehouses = {
+            "4": 'shop',
+            "5": 'x',
+            "6": 'y'
         }
 
     def get_warehouses_links(self, request_url):
@@ -44,8 +44,7 @@ class GetWarehousesValues(PrestaRequest):
                 xml_content = ET.fromstring(get_comb_data.content)
                 general_tag = xml_content[0]
 
-                warehouse =  self.warehouses.get(general_tag.find('id_warehouse').text)
-
+                warehouse =  self.name_warehouses.get(general_tag.find('id_warehouse').text)
 
                 combination = general_tag.find('id_product_attribute').text
                 quantity = general_tag.find('real_quantity').text

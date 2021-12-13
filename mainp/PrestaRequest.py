@@ -30,7 +30,7 @@ class PrestaRequest:
     """
     # Logger conf
     formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    logger_base_dir = os.path.dirname(os.path.abspath(__file__))
 
 
     def __init__(self, api_secret_key, request_url=None, **kwargs):
@@ -169,7 +169,7 @@ class PrestaRequest:
     def check_default_comb(self, stock_list):
         stock_values = []
         # Write log
-        file_handler = logging.FileHandler(self.base_dir + "/mainp/presta_logs/comb_check.log")
+        file_handler = logging.FileHandler(self.logger_base_dir + "/mainp/presta_logs/comb_check.log")
         logger = logging.getLogger('comb_check_log')
         logger.setLevel(logging.DEBUG)
         file_handler.setFormatter(self.formatter)
@@ -226,7 +226,7 @@ class PrestaRequest:
 
                 # Logger
                 logger.info(
-                str(candidate) + "will be mark as \"default\", and " + default + " will be unmarked.")
+                str(candidate) + "will be mark as \"default\", and " + str(default) + " will be unmarked.")
                
                 return True
 

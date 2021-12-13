@@ -169,7 +169,7 @@ class PrestaRequest:
     def check_default_comb(self, stock_list):
         stock_values = []
         # Write log
-        file_handler = logging.FileHandler(self.logger_base_dir + "/mainp/presta_logs/comb_check.log")
+        file_handler = logging.FileHandler(self.logger_base_dir + "/presta_logs/comb_check.log")
         logger = logging.getLogger('comb_check_log')
         logger.setLevel(logging.DEBUG)
         file_handler.setFormatter(self.formatter)
@@ -227,10 +227,11 @@ class PrestaRequest:
                 # Logger
                 logger.info(
                 str(candidate) + "will be mark as \"default\", and " + str(default) + " will be unmarked.")
-               
+                logger.info(str(a) + ":" + str(b))
                 return True
 
             elif candidate is None or default is None:
+                logger.info("Candidate " + str(candidate) + " and " + str(default) + " are not eq. but: OK")
                 return True
                 
             else:
@@ -495,9 +496,21 @@ class PrestaRequest:
 
     def xml_response_create(self, new_quantity, comb_check=False):
         try:
-            if comb_check and self.stock_list:
-                self.check_default_comb(self.stock_list)
+            file_handler = logging.FileHandler(self.logger_base_dir + "/presta_logs/comb_check.log")
+            logger = logging.getLogger('comb_check_log')
+            logger.setLevel(logging.DEBUG)
+            file_handler.setFormatter(self.formatter)
+            logger.addHandler(file_handler)
 
+            try:
+                if comb_check and self.stock_list:
+                    a = self.check_default_comb(self.stock_list)
+                    logger.warning(str(a))
+
+            except Exception as e:
+                logger.error(e)
+ 
+                
             get_stock_xml = requests.get(self.stock_url, auth=(self.api_secret_key, ''))
             
             xml_content = ET.fromstring(get_stock_xml.content)  # Create ET instanse and root tag
@@ -1005,7 +1018,7 @@ class PrestaRequest:
             with open(self.base_dir + "/AP/restore/session/restore.json", "w") as json_object:
                 json.dump(data, json_object, indent=4)
 
-        return {'OK': 'OK'}
+        return {'success': 'OK'}
 
         
 

@@ -170,9 +170,9 @@ class ProductApi(PrestaRequest):
                 current_proc = "{:.2f}".format(current_proc)
 
                 if terminal_size > 91:
-                    loading_str = "Loading: [_" + "#"*str_tag + "_"*(50-str_tag) + "_]" + f" {current_proc} / 100%"
+                    loading_str = "Loading: [_" + "#"*str_tag + "_"*(50-str_tag) + "_]" + " {} / 100%".format(current_proc)
                 else:
-                    loading_str = "Loading: [" f" {current_proc} / 100% ]"
+                    loading_str = "Loading: [ {} / 100% ]".format(current_proc)
 
                 print(loading_str, end='\r')
 
@@ -189,14 +189,6 @@ class ProductApi(PrestaRequest):
         if self.file_name is None:
             self.file_name = 'system_products.json'
 
-        with open(f"json_log/{self.file_name}", "w") as f:
+        with open("json_log/" + self.file_name, "w") as f:
             json.dump(py_data, f)
-
-
-
-
-# if __name__ == "__main__":
-#     ad = ProductApi()
-#     prod_dict = ad.get_all_products()
-
 

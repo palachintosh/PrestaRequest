@@ -482,7 +482,7 @@ class PrestaRequest:
 
                         else:
                             total_q = int(self.quantity) + mgmt_var
-                            self.xml_response_create(new_quantity=total_q)
+                            self.xml_response_create(new_quantity=total_q, comb_check=True)
 
                             return total_q
                     else:
@@ -493,8 +493,11 @@ class PrestaRequest:
             return None
 
 
-    def xml_response_create(self, new_quantity):
+    def xml_response_create(self, new_quantity, comb_check=False):
         try:
+            if comb_check and self.stock_list:
+                self.check_default_comb(self.stock_list)
+
             get_stock_xml = requests.get(self.stock_url, auth=(self.api_secret_key, ''))
             
             xml_content = ET.fromstring(get_stock_xml.content)  # Create ET instanse and root tag
@@ -508,9 +511,6 @@ class PrestaRequest:
             format_xml_tree.write(os.path.join(self.base_dir, 'temp/log.xml'))
 
             self.restore_write_json(stock_url=self.stock_url, xml_data=get_stock_xml.text)
-
-            if self.stock_list:
-                self.check_default_comb(self.stock_list)
 
             return True
         except:

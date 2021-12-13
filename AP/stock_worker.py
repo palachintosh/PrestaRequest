@@ -4,6 +4,8 @@
 
 
 from datetime import datetime
+
+from django.views.generic import base
 from mainp.api_secret_key import api_secret_key
 from .auth_data import MAIN_STOCK_URL
 from .products_api import ProductApi
@@ -14,8 +16,8 @@ import json
 
 
 class StocksWorker(AdminParser, ProductApi):
-    
-    impossible_to_add: dict
+
+    impossible_to_add = {}
     operation_status = None
     stock_url = MAIN_STOCK_URL
     stock_xml_urls = []
@@ -79,6 +81,9 @@ class StocksWorker(AdminParser, ProductApi):
 
 
     def imposible_var_log(self):
+        import os.path
+
+        base_imposible_dir = os.path.dirname(os.path.abspath(__file__))
         if self.impossible_to_add.get(self.product_id) is None:
             self.impossible_to_add.update({
                     self.product_id: [self.comb_id]
@@ -92,7 +97,7 @@ class StocksWorker(AdminParser, ProductApi):
                 self.product_id: get_comb
             })
         
-        with open("logs/impossible_.json", "w") as f:
+        with open(base_imposible_dir + "/logs/impossible_.json", "w") as f:
             json.dump(self.impossible_to_add, f)
 
 

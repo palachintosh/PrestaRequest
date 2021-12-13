@@ -15,6 +15,7 @@ from .auth_data import ID_WAREHOUSES, AUTH_DATA
 
 import json
 import logging
+import os.path
 
 
 
@@ -74,8 +75,6 @@ class APStockWorker(StocksWorker):
     def sw_main_cycle(self, product_id=None, comb_list=None, use_file=False):
         ap_response_status = {}
 
-        self.logger.info("SW_CYCLE: ", str(self.file_object))
-
         if use_file:
             self.sw_file_object()
             if not self.file_object:
@@ -89,8 +88,9 @@ class APStockWorker(StocksWorker):
         array_len = len(self.file_object)
         counter = 1
 
+        self.logger.warning("SYCLE: " + str(self.file_object) + str(product_id) + str(comb_list))
     
-        # Parsing file
+        # Parsing file or dict
         for product_id, comb_list in self.file_object.items():
             for comb_id in comb_list:
 
@@ -107,7 +107,7 @@ class APStockWorker(StocksWorker):
 
                 if int(current_proc) >= 2 and int(current_proc) <= 100:
                     str_tag = int(current_proc / 2)
-                    current_proc = "{:.2f}".format(current_proc)
+                    current_proc = "{}".format(current_proc)
 
                     if terminal_size > 91:
                         loading_str = "Loading: [_" + "#"*str_tag + "_"*(50-str_tag) + "_]" + " {} / 100%".format(current_proc)

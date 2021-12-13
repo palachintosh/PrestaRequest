@@ -4,6 +4,7 @@
 
 
 from datetime import datetime
+from os import remove
 
 from django.views.generic import base
 from mainp.api_secret_key import api_secret_key
@@ -12,6 +13,8 @@ from .products_api import ProductApi
 from .AdminParser import AdminParser
 import requests
 import json
+import logging
+import os.path
 
 
 
@@ -23,6 +26,15 @@ class StocksWorker(AdminParser, ProductApi):
     stock_xml_urls = []
 
     product_id = comb_id = stock_id = None
+
+
+    formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
+    base_sw_dir = os.path.dirname(os.path.abspath(__file__))
+    file_handler = logging.FileHandler(base_sw_dir + "/logs/stock_worker.log")
+    logger = logging.getLogger('stock_worker_log')
+    logger.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
 
     # Func checks if stock available in warehouse and return boolean value
@@ -59,10 +71,13 @@ class StocksWorker(AdminParser, ProductApi):
             self.auth()
 
             if self.status != 200:
+                self.logger.critical("Auth data is invalid or sever does not respond! {}".format(self.status))
                 return "Auth data is invalid or sever does not respond! {}".format(self.status)
 
 
         stocks = len(self.stock_xml_urls)
+        self.logger.info("Stocks_len: " + str(self.stock_xml_urls))
+
         if stocks >= 0:
             return self.stock_init_all()
 
@@ -74,7 +89,9 @@ class StocksWorker(AdminParser, ProductApi):
         # Update stocks
         self.stock_finder(self.comb_id)
 
-        if add_product.get('status') == 'OK' and len(self.stock_xml_urls) != 0:
+        self.logger.info(str(add_product))
+
+        if add_product.get('status') == 'OK' and self.stock_xml_urls:
             return True
 
         return False
@@ -84,6 +101,9 @@ class StocksWorker(AdminParser, ProductApi):
         import os.path
 
         base_imposible_dir = os.path.dirname(os.path.abspath(__file__))
+
+        self.logger.error(base_imposible_dir)
+        
         if self.impossible_to_add.get(self.product_id) is None:
             self.impossible_to_add.update({
                     self.product_id: [self.comb_id]
@@ -106,12 +126,16 @@ class StocksWorker(AdminParser, ProductApi):
         if not first_init:
             first_step = self.stock_add_first()
 
+            self.logger.info(str(first_init))
+            self.logger.info(str(first_step))
+
             if not first_step:
                 self.imposible_var_log()
 
                 return False
         
-    
+        self.logger.info(str(self.stock_xml_urls))
+
         if len(self.stock_xml_urls) > 0:
             transfer = True
 
@@ -125,6 +149,8 @@ class StocksWorker(AdminParser, ProductApi):
                         comb_id=self.comb_id,
                         id_war_to=war_id,
                         )
+                    
+                    self.logger.warning(str(transfer_stock))
                     
                     self.stock_finder(self.comb_id)
 
@@ -144,6 +170,8 @@ class StocksWorker(AdminParser, ProductApi):
                         id_warehouse=6
                         )
                     
+                    self.logger.warning(str(remove_stock))
+                    
                     if remove_stock.get('status') == 'OK':
                         return True
         
@@ -153,6 +181,8 @@ class StocksWorker(AdminParser, ProductApi):
 
     def stock_shop_finder(self, war_id):
         if not self.stock_xml_urls is None and len(self.stock_xml_urls) > 0:
+            self.logger.warning(str(self.stock_xml_urls))
+            
             for stock in self.stock_xml_urls:
                 stock_get_warehouse = requests.get(
                     self.stock_url + stock,

@@ -9,10 +9,21 @@ from mainp.PrestaRequest import PrestaRequest
 from .AP_mixin import APMvmtMixin
 from .auth_data import *
 import requests
+import logging
+import os.path
 
 
 class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
-    status: int
+    status = 0
+
+    formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
+    base_sw_dir = os.path.dirname(os.path.abspath(__file__))
+    file_handler = logging.FileHandler(base_sw_dir + "/logs/adn_parser.log")
+    logger = logging.getLogger('adn_parser')
+    logger.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
 
     def __init__(self, login, password):
         self.login = login
@@ -29,6 +40,9 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
         main_url = MAIN_ADN_LINK + self.action
 
         add_post_req = self.rs.post(main_url, data=request_data)
+
+        self.logger.info("W_post_request" + str(add_post_req.status_code))
+
         self.status = add_post_req.status_code
 
         if self.status == 200:
@@ -53,6 +67,8 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
             'redirect': '127b7b8242e9acfe2138fa9d2d3dfa5d'
         }
 
+        self.logger.info("Auth data: " + str(data))
+
         auth_request = self.rs.post(MAIN_ADN_LINK + "ajax-tab.php", data=data)
         self.status = auth_request.status_code
 
@@ -69,6 +85,7 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 stock_mvt_event=event
                 )
 
+        self.logger.debug("GET_FORM " + str(get_form))
         return get_form
 
 
@@ -80,6 +97,8 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
 
         # Make attempt to get_form
         mvt_attempt = self.mvmt_product_mixin(mvmt_event='add')
+
+        self.logger.info("ADN_STOCK_ADD: " + str(mvt_attempt))
 
         if mvt_attempt.status_code == 200:
             # from_war_id always eq. 4 (SHOP)
@@ -93,7 +112,7 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 # if confirm_post == 'Yes':
                 
                 add_post = self._w_post_request(pd)
-                if add_post.get('success'):
+                if add_post.get('status') == "OK":
                     return add_post
 
                 else:
@@ -110,6 +129,8 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
 
         mvt_attempt = self.mvmt_product_mixin(mvmt_event='remove')
 
+        self.logger.info(str(mvt_attempt))
+
         if mvt_attempt.status_code == 200:
             pd = self.post_data_collector(
                 form_response=mvt_attempt.text,
@@ -123,7 +144,7 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 #     return self._w_post_request(pd)
                 remove_post = self._w_post_request(pd)
                 
-                if remove_post.get('success'):
+                if remove_post.get('status') == "OK":
                     return remove_post
 
                 else:
@@ -139,6 +160,8 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
         self.id_war_to = id_war_to
 
         mvt_attempt = self.mvmt_product_mixin(mvmt_event='transfer')
+
+        self.logger.info(str(mvt_attempt))
 
         if mvt_attempt.status_code == 200:
             pd = self.post_data_collector(
@@ -158,7 +181,7 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 #     return self._w_post_request(pd)
                 transfer_post = self._w_post_request(pd)
                 
-                if transfer_post.get('success'):
+                if transfer_post.get('status') == "OK":
                     return transfer_post
 
                 else:

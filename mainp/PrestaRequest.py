@@ -226,7 +226,7 @@ class PrestaRequest:
 
                 # Logger
                 logger.info(
-                f"{candidate} will be mark as \"default\", and {default} will be unmarked.")
+                str(candidate) + "will be mark as \"default\", and " + default + " will be unmarked.")
                
                 return True
 
@@ -474,7 +474,7 @@ class PrestaRequest:
                     # and decrease general quantity
                     if self.get_combination_link == combination_link.get('{http://www.w3.org/1999/xlink}href'):
                         self.stock_url = str(i)
-                        print(f"Product with id {id_product} will be delete! Total quantity: {self.quantity}")
+                        print("Product with id " + str(id_product) + " will be delete! Total quantity: " + str(self.quantity))
 
                         if zero_quantity:
                             self.xml_response_create(0)
@@ -486,7 +486,7 @@ class PrestaRequest:
 
                             return total_q
                     else:
-                        print(f"Product id: {id_product}.", int(self.quantity), combination_link.text)
+                        print("Product id: {}.".format(id_product), int(self.quantity), combination_link.text)
                 else:
                     return stock_page.status_code
         else:
@@ -552,7 +552,7 @@ class PrestaRequest:
 
     def stock_control(self, reference, warehouse, request_url=None):
         if request_url == None:
-            request_url = f"https://3gravity.pl/api/stocks/?filter[reference]=%[{reference}]%"
+            request_url = "https://3gravity.pl/api/stocks/?filter[reference]=%[{}]%".format(reference)
         
         get_stock_content = requests.get(request_url, auth=(self.api_secret_key, ''))
 
@@ -783,7 +783,7 @@ class PrestaRequest:
     def to_w_transfer(self, quantity_to_transfer, w_to, code):
         update_warehouse = None
         add_bikes = None
-        self.request_url = f"https://3gravity.pl/api/combinations/?filter[reference]=%[{code}]%"
+        self.request_url = "https://3gravity.pl/api/combinations/?filter[reference]=%[{}]%".format(code)
 
         # Get link product on warehouse
         request_url_to = self.stock_control(warehouse=w_to, reference=code)
@@ -878,7 +878,7 @@ class PrestaRequest:
 
     # Using only in App classes for getting data for initializing
     def get_init_data(self, code):
-        self.request_url = f"https://3gravity.pl/api/combinations/?filter[reference]=%[{code}]%"
+        self.request_url = "https://3gravity.pl/api/combinations/?filter[reference]=%[{}]%".format(code)
         get_params = self.get_product_url()
 
 
@@ -916,7 +916,7 @@ class PrestaRequest:
         xml_value = []
 
         try:
-            with open(f"{self.base_dir}/AP/restore/session/restore.json", "r") as json_object:
+            with open(self.base_dir + "/AP/restore/session/restore.json", "r") as json_object:
                 data = json.load(json_object)
 
         
@@ -951,7 +951,7 @@ class PrestaRequest:
                 data.get(update_by_key).update({"history": "yes"})
 
 
-        with open(f"{self.base_dir}/AP/restore/session/restore.json", "w") as json_object:
+        with open(self.base_dir + "/AP/restore/session/restore.json", "w") as json_object:
             json.dump(data, json_object, indent=4)
 
         return None
@@ -985,7 +985,7 @@ class PrestaRequest:
     def restore_last_action(self, restore_id):
         data = None
 
-        with open(f"{self.base_dir}/AP/restore/session/restore.json", "r") as json_object:
+        with open(self.base_dir + "/AP/restore/session/restore.json", "r") as json_object:
             data = json.load(json_object)
 
         if data is None:
@@ -1002,7 +1002,7 @@ class PrestaRequest:
 
             data_dict.update({"history": "yes"})
 
-            with open(f"{self.base_dir}/AP/restore/session/restore.json", "w") as json_object:
+            with open(self.base_dir + "/AP/restore/session/restore.json", "w") as json_object:
                 json.dump(data, json_object, indent=4)
 
         return {'OK': 'OK'}

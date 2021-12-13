@@ -107,10 +107,10 @@ class APStockWorker(StocksWorker):
                     current_proc = "{:.2f}".format(current_proc)
 
                     if terminal_size > 91:
-                        loading_str = "Loading: [_" + "#"*str_tag + "_"*(50-str_tag) + "_]" + f" {current_proc} / 100%"
+                        loading_str = "Loading: [_" + "#"*str_tag + "_"*(50-str_tag) + "_]" + " {} / 100%".format(current_proc)
                         
                     else:
-                        loading_str = "Loading: [" f" {current_proc} / 100% ]"
+                        loading_str = "Loading: [ {} / 100% ]".format(current_proc)
                         print(loading_str, end='\r')
 
             counter += 1
@@ -145,12 +145,12 @@ class APStockWorker(StocksWorker):
                 })
                 return ap_response_status
             
-            log_str = f"Product {self.product_id} with comb. {comb_id} was added."
+            log_str = "Product {} with comb. {} was added.".format(self.product_id, comb_id)
             logger.info(log_str)
             ap_response_status.update({"success": log_str})
 
         else:
-            log_str = f"Product {self.product_id} with comb. {comb_id} already exists."
+            log_str = "Product {} with comb. {} already exists.".format(self.product_id, comb_id)
             logger.debug(log_str)
             ap_response_status.update({"success": log_str})
 

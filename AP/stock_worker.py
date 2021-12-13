@@ -29,7 +29,7 @@ class StocksWorker(AdminParser, ProductApi):
         self.comb_id = comb_id
 
         get_stock_list = requests.get(
-                self.stock_url + f'?filter[id_product_attribute]={self.comb_id}',
+                self.stock_url + "?filter[id_product_attribute]={}".format(self.comb_id),
                 auth=(api_secret_key, ''))
         
         stock_xml_data = self.get_ps_xml_tag(
@@ -57,7 +57,7 @@ class StocksWorker(AdminParser, ProductApi):
             self.auth()
 
             if self.status != 200:
-                return f"Auth data is invalid or sever does not respond! {self.status}"
+                return "Auth data is invalid or sever does not respond! {}".format(self.status)
 
 
         stocks = len(self.stock_xml_urls)
@@ -163,21 +163,5 @@ class StocksWorker(AdminParser, ProductApi):
                         return stock
         
         return None
-
-
-
-
-# if __name__ == "__main__":
-#     sw = StocksWorker(login=AUTH_DATA[0], password=AUTH_DATA[1])
-#     sw.product_id = 2701
-
-#     stock_checker = sw.stock_finder(comb_id=8507)
-
-#     if stock_checker != 3:
-#         init_stocks = sw.stock_war_values_checker()
-
-#         print(init_stocks)
-#     else:
-#         print(stock_checker)
 
 

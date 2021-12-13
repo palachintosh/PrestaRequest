@@ -7,7 +7,7 @@
 # If I want to get all products_id - I need to call ProductsId class,
 # for initializing stocks - just call the StockWorker etc. 
 
-from sys import api_version, argv
+from sys import argv
 from time import sleep
 from .products_api import *
 from .stock_worker import StocksWorker
@@ -16,14 +16,6 @@ from .auth_data import ID_WAREHOUSES, AUTH_DATA
 import json
 import logging
 
-# Logger conf
-formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
-base_dir = os.path.dirname(os.path.abspath(__file__))
-file_handler = logging.FileHandler(base_dir + "/logs/stock_worker.log")
-logger = logging.getLogger('stock_worker_log')
-logger.setLevel(logging.DEBUG)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
 
 
 # Class will collecting products for tests
@@ -52,6 +44,15 @@ class APProductsCollector(ProductApi):
 # This class managing stocks. Add, delete and transfer
 class APStockWorker(StocksWorker):
     # Try to desrialize json file from "json_log"
+    # Logger conf
+    formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    file_handler = logging.FileHandler(base_dir + "/logs/stock_worker.log")
+    logger = logging.getLogger('stock_worker_log')
+    logger.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
     def __init__(self, login, password):
         super().__init__(login, password)
         self.file_object = None
@@ -72,6 +73,8 @@ class APStockWorker(StocksWorker):
 
     def sw_main_cycle(self, product_id=None, comb_list=None, use_file=False):
         ap_response_status = {}
+
+        self.logger("SW_CYCLE: ", str(self.file_object))
 
         if use_file:
             self.sw_file_object()
@@ -138,7 +141,7 @@ class APStockWorker(StocksWorker):
             init_stocks = self.stock_war_values_checker()
             
             if isinstance(init_stocks, str):
-                logger.error(init_stocks)
+                self.logger.error(init_stocks)
                 
                 ap_response_status.update({
                     "error": init_stocks
@@ -146,12 +149,12 @@ class APStockWorker(StocksWorker):
                 return ap_response_status
             
             log_str = "Product {} with comb. {} was added.".format(self.product_id, comb_id)
-            logger.info(log_str)
+            self.logger.info(log_str)
             ap_response_status.update({"success": log_str})
 
         else:
             log_str = "Product {} with comb. {} already exists.".format(self.product_id, comb_id)
-            logger.debug(log_str)
+            self.logger.debug(log_str)
             ap_response_status.update({"success": log_str})
 
 

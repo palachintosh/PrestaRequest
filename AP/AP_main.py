@@ -74,7 +74,7 @@ class APStockWorker(StocksWorker):
     def sw_main_cycle(self, product_id=None, comb_list=None, use_file=False):
         ap_response_status = {}
 
-        self.logger("SW_CYCLE: ", str(self.file_object))
+        self.logger.info("SW_CYCLE: ", str(self.file_object))
 
         if use_file:
             self.sw_file_object()

@@ -107,6 +107,8 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 from_war_id=4,
                 event='add')
 
+            self.logger.warning(str(pd))
+
             if not pd is None:
                 # confirm_post = input("All data was colected! Do you wanna POST? Yes/any: ")
                 # if confirm_post == 'Yes':
@@ -136,6 +138,8 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 form_response=mvt_attempt.text,
                 from_war_id=id_warehouse,
                 event='remove')
+
+            self.logger.warning(str(pd))
             
             if not pd is None:
                 print(pd)
@@ -169,6 +173,8 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 from_war_id=id_war_to,
                 event='transfer'
             )
+            
+            self.logger.warning(str(pd))
 
             if not pd is None:
                 # Removing unusable values

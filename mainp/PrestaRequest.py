@@ -1,10 +1,18 @@
+from json import load
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import ElementTree
+from .var import *
+from string import ascii_letters, digits
+import random
+import json
+import logging
+
 import base64
 
 import requests
 import os.path
 import datetime
+
 
 
 """ 
@@ -20,6 +28,10 @@ class PrestaRequest:
         request_url: link of product that you want to change,
         new_text_value: the value you want to set up,
     """
+    # Logger conf
+    formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
 
     def __init__(self, api_secret_key, request_url=None, **kwargs):
         
@@ -41,13 +53,21 @@ class PrestaRequest:
         self.w_from = None
         self.w_to = None
         self.date = str(datetime.datetime.now().strftime("%d-%m-%Y, %H:%M"))
+        
 
-
+        # Product active stamp
+        active_status = None
         self.warehouses = {
             'shop': '4',
             'x': '5',
             'y': '6'
         }
+
+        # Restore token generate
+        symbols =ascii_letters + digits
+        rand = random.SystemRandom()
+        self.restore_id = "".join(rand.choice(symbols) for i in range(8))
+
 
     # Private methods here ++++++++++++++++++++++++++++++++
 
@@ -100,14 +120,7 @@ class PrestaRequest:
 
     #warehouse_detect
     def _wd(self, warehouse, data):
-
-        # warehouses = {
-        #     'shop': '4',
-        #     'x': '5',
-        #     'y': '6'
-        # }
-
-        if type(data) == list:
+        if isinstance(data, list):
             for link in data:
                 get_warehouse_id = requests.get(str(link), auth=(self.api_secret_key, ''))
                 
@@ -140,20 +153,94 @@ class PrestaRequest:
                     data=get_combination_xml,
                     kwargs=request_data)
                 self.get_combination_link = get_combination_data.get('product_link')
-                print(self.get_combination_link)
+
                 
-                if self.get_combination_link != None:
+                if self.get_combination_link is not None:
 
                     return self.get_combination_link
 
             except:
                 return None
 
-    
+
+    # Check combination default values, quantity
+    # and find the highest value.
+    # Than, setting up this to default
+    def check_default_comb(self, stock_list):
+        stock_values = []
+        # Write log
+        file_handler = logging.FileHandler(self.base_dir + "/mainp/presta_logs/comb_check.log")
+        logger = logging.getLogger('comb_check_log')
+        logger.setLevel(logging.DEBUG)
+        file_handler.setFormatter(self.formatter)
+        logger.addHandler(file_handler)
+ 
+
+        for get_dc in stock_list:
+            # Get request on stock_availables
+            get_stock = requests.get(get_dc, auth=(self.api_secret_key, ''))
+
+            if get_stock.status_code != 200:
+                return False
+            
+            get_values = self.get_ps_xml_tag(
+                "quantity", "id_product_attribute",
+                content=get_stock.content,
+                tag=None,
+            )
+
+            if get_values is None:
+                return False
+
+            else:
+                if get_values.get('id_product_attribute') != '0':
+                    stock_values.append(get_values)
+
+
+        if len(stock_values) > 0:
+            candidate = None
+            default = None
+
+            for i in stock_values:
+                check_if_default = self.set_default_combination(
+                        comb_id=i.get('id_product_attribute'),
+                        value=""
+                    )
+
+                if not check_if_default and int(i.get('quantity')) > 0:
+                    candidate = i.get('id_product_attribute')
+
+                elif not check_if_default and int(i.get('quantity')) == 0:
+                    continue
+
+                elif check_if_default and int(i.get('quantity')) == 0:
+                    default = i.get('id_product_attribute')
+
+                else:
+                    return True
+                
+
+            if candidate != default and ((not candidate is None) and (not default is None)):
+                a = self.set_default_combination(comb_id=default, value="", check=False)
+                b = self.set_default_combination(comb_id=candidate, value="1", check=False)
+
+                # Logger
+                logger.info(
+                f"{candidate} will be mark as \"default\", and {default} will be unmarked.")
+               
+                return True
+
+            elif candidate is None or default is None:
+                return True
+                
+            else:
+                return False
+                
+            
     # Get product link from combination page
     def get_product_url(self, request_url=None):
         
-        if request_url == None:
+        if request_url is None:
             get_combination_link = self.get_combination_url()
         else:
             get_combination_link = request_url
@@ -168,7 +255,7 @@ class PrestaRequest:
                     data=get_product_link_from_comb,
                     kwargs=request_data)
                 
-                if product_url != None:
+                if product_url is not None:
                     return product_url.get('product_link')
                 
             else:
@@ -237,9 +324,103 @@ class PrestaRequest:
         # Return None if request failed
         else:
             return None
+    
 
 
-    def stock_parser(self, quantity_to_transfer, delete=True, stock_list=None):
+    def get_ps_xml_tag(self, *args, content, tag, find_all=True):
+        """
+            DONT use "find_all" with "args".
+            If "args" was given, finder will be try to find ONLY single value for each tag
+        """
+        tag_context = {}
+
+        xml_content = ET.fromstring(content)
+        main_tag = xml_content[0]
+
+        
+        if len(args) == 0:
+            if find_all:
+                return main_tag.findall(tag)
+
+            else:
+                return main_tag.find(tag)
+        
+        else:
+            for tag in args:
+                get_tag_context = main_tag.find(tag)
+
+                if not get_tag_context is None: 
+                    tag_context.update({
+                        tag: get_tag_context.text
+                    })
+            
+            return tag_context
+
+
+    # Forms response for product_card with changed activity
+    def activity_reponse(self, product, tag, value):
+        try:
+            xml_content = ET.fromstring(product)
+            general_tag = xml_content[0]
+            
+            tag = general_tag.find(tag)
+            tag.text = value
+
+            # Not filterable delete
+            not_filter_tags = []
+            
+            for not_filter in general_tag:
+                if not_filter.get('notFilterable') == 'true':
+                    not_filter_tags.append(not_filter)
+
+            for i in not_filter_tags:
+                general_tag.remove(i)
+            
+            format_xml_tree = ElementTree(xml_content)
+            format_xml_tree.write(os.path.join(self.base_dir, 'temp/log.xml'))
+            
+            return True
+
+        except:
+            return False
+
+
+    # Check if activity more than 0
+    def product_active_check(self, product_id) -> bool:
+        product_page = requests.get(MAIN_PRODUCTS_URL + product_id, auth=(self.api_secret_key, ''))
+
+        if product_page.status_code == 200:
+            activity = self.get_ps_xml_tag(
+                content=product_page.content,
+                tag="active",
+                find_all=False)
+
+
+            if activity.text == '1':
+                return True
+
+
+            else:
+                activity_set = self.activity_reponse(
+                    product=product_page.content,
+                    tag="active",
+                    value="1",
+                )
+
+                if activity_set:
+                    activate_product = self.presta_put(request_url=MAIN_PRODUCTS_URL+product_id)
+
+                    if activate_product.get("success"):
+                        return True
+        
+        return False
+
+
+    def stock_parser(self, 
+                    quantity_to_transfer,
+                    delete=True,
+                    stock_list=None,
+                    zero_quantity=False):
 
         # Check if stock_list has anything
         # If not - get stock link from func
@@ -249,8 +430,8 @@ class PrestaRequest:
                 stock_list = stock_list.get('stock_data')
             else:
                 return None
-            
-        
+
+
         # If true, than increment quantity
         if not delete:
             mgmt_var = quantity_to_transfer
@@ -258,7 +439,8 @@ class PrestaRequest:
             mgmt_var = -1
 
         if len(stock_list) != 0:
-
+            
+            self.stock_list = stock_list
             # Stocks parsing
             for i in stock_list:
                 stock_page = requests.get(i, auth=(self.api_secret_key, ''))
@@ -266,28 +448,45 @@ class PrestaRequest:
                 if stock_page.status_code == 200:
                     xml_content = ET.fromstring(stock_page.content)
 
-                    # Get total quantity from stock_availables
-                    self.quantity = xml_content[0].find('quantity').text
-                    print("QUANTITY: ", self.quantity)
-                    # Get product atribute
-                    combination_link = xml_content[0].find('id_product_attribute')
                     # Get product id
                     id_product = xml_content[0].find('id_product').text
 
-                    print(self.get_combination_link, " / ", combination_link.get('{http://www.w3.org/1999/xlink}href'))
+                    # Get total quantity from stock_availables
+                    try:
+                        self.quantity = int(xml_content[0].find('quantity').text)
+                        if self.quantity >= 0 or mgmt_var > 0:
+                            active_check = self.product_active_check(id_product)
+                            
+                            if active_check:
+                                self.active_status = True
 
-                    # Varify product
+                    except Exception as e:
+                        print("Product exists but not acvive yet!")
+
+                    # Get product atribute
+                    combination_link = xml_content[0].find('id_product_attribute')
+
+                    # print(self.get_combination_link, " / ", combination_link.get('{http://www.w3.org/1999/xlink}href'))
+
+                    # Verify product
                     # If global combination link and combination link from product card are eq.
                     # Than write global self.stock_url for future PUT request
                     # and decrease general quantity
                     if self.get_combination_link == combination_link.get('{http://www.w3.org/1999/xlink}href'):
                         self.stock_url = str(i)
-                        print("Product with id {} will be delete! Total quantity: {}".format(id_product, self.quantity))
+                        print(f"Product with id {id_product} will be delete! Total quantity: {self.quantity}")
 
-                        if self.xml_response_create(new_quantity=int(self.quantity) + mgmt_var):
-                            return(int(self.quantity) + mgmt_var)
+                        if zero_quantity:
+                            self.xml_response_create(0)
+                            return 0
+
+                        else:
+                            total_q = int(self.quantity) + mgmt_var
+                            self.xml_response_create(new_quantity=total_q)
+
+                            return total_q
                     else:
-                        print("Product id: {}.".format(id_product), int(self.quantity), combination_link)
+                        print(f"Product id: {id_product}.", int(self.quantity), combination_link.text)
                 else:
                     return stock_page.status_code
         else:
@@ -307,6 +506,11 @@ class PrestaRequest:
 
             format_xml_tree = ElementTree(xml_content)
             format_xml_tree.write(os.path.join(self.base_dir, 'temp/log.xml'))
+
+            self.restore_write_json(stock_url=self.stock_url, xml_data=get_stock_xml.text)
+
+            if self.stock_list:
+                self.check_default_comb(self.stock_list)
 
             return True
         except:
@@ -337,7 +541,6 @@ class PrestaRequest:
             return {'success': 'All data has been updated!'}
         
         else:
-            print(update_stocks.status_code)
             return {'error': update_stocks.status_code}
 
 
@@ -349,31 +552,44 @@ class PrestaRequest:
 
     def stock_control(self, reference, warehouse, request_url=None):
         if request_url == None:
-            request_url = 'https://3gravity.pl/api/stocks/?filter[reference]={}'.format(reference)
+            request_url = f"https://3gravity.pl/api/stocks/?filter[reference]=%[{reference}]%"
         
         get_stock_content = requests.get(request_url, auth=(self.api_secret_key, ''))
 
         if get_stock_content.status_code == 200:
-            try:
-                xml_content = ET.fromstring(get_stock_content.content)
-                general_product = xml_content[0]
-                get_stock_url = general_product.findall('stock')
-                response_data = []
+            response_data = []
 
-                if len(get_stock_url) >= 1:
-                    for i in get_stock_url:
-                        response_data.append(i.get('{http://www.w3.org/1999/xlink}href'))
-                    
-                    return self._wd(warehouse=warehouse, data=response_data)
+            get_stock_url = self.get_ps_xml_tag(
+                content=get_stock_content.content,
+                tag="stock",
+                find_all=True
+            )
 
-            except:
+            if get_stock_url is None:
                 return "Product does not exist!"
+
+
+            if len(get_stock_url) >= 1:
+                for i in get_stock_url:
+                    response_data.append(i.get('{http://www.w3.org/1999/xlink}href'))
+                    
+                return self._wd(warehouse=warehouse, data=response_data)
 
         else:
             return get_stock_content.status_code
 
 
-    def warehouse_quantity_mgmt(self, warehouse, reference, quantity_to_transfer=None, delete=True, request_url=None):
+    def warehouse_quantity_mgmt(self,
+                                warehouse,
+                                reference,
+                                quantity_to_transfer=None,
+                                delete=True,
+                                request_url=None,
+                                zero_quantity=False):
+
+        # Need for restore quantity if smth goes wrong
+        self.save_quantity = None
+
         if request_url == None:
             request_url = self.stock_control(warehouse=warehouse, reference=reference)
 
@@ -421,14 +637,27 @@ class PrestaRequest:
             get_physical_quantity = general_product.find('physical_quantity')
             get_usable_quantity = general_product.find('usable_quantity')
 
-            if (int(get_physical_quantity.text) + mgmt_var) >= 0:
+            if zero_quantity:
+                if int(get_physical_quantity.text) != 0:
+                    self.get_product_attribute = general_product.find('id_product_attribute').text
+                    self.get_product_id = general_product.find('id_product').text
+                    self.save_quantity = get_physical_quantity.text
 
-                get_physical_quantity.text = str(int(get_physical_quantity.text) + mgmt_var)
-                get_usable_quantity.text = str(int(get_usable_quantity.text) + mgmt_var)
+                    get_physical_quantity.text = '0'
+                    get_usable_quantity.text = '0'
+                
+                else:
+                    return -1
 
             else:
-                return {'error': 'Unable to delete products! Total quantity is less than 0.'}
-            
+                if (int(get_physical_quantity.text) + mgmt_var) >= 0:
+
+                    get_physical_quantity.text = str(int(get_physical_quantity.text) + mgmt_var)
+                    get_usable_quantity.text = str(int(get_usable_quantity.text) + mgmt_var)
+
+                else:
+                    return {'error': 'Unable to delete products! Total quantity is less than 0.'}
+                
 
             # Remove not filterable field for PUT request
             get_not_filterable_fields = general_product.find('real_quantity')
@@ -444,6 +673,9 @@ class PrestaRequest:
 
             # Write XML for PUT request
             format_xml_tree.write(os.path.join(self.base_dir, 'temp/log.xml'))
+            
+            self.restore_write_json(stock_url=request_url, xml_data=get_stocks_content.text)
+
 
             data = {
                 'name': 'log.txt',
@@ -549,14 +781,13 @@ class PrestaRequest:
 
 
     def to_w_transfer(self, quantity_to_transfer, w_to, code):
-
         update_warehouse = None
         add_bikes = None
-        self.request_url = 'https://3gravity.pl/api/combinations/?filter[reference]={}'.format(code)
+        self.request_url = f"https://3gravity.pl/api/combinations/?filter[reference]=%[{code}]%"
 
         # Get link product on warehouse
         request_url_to = self.stock_control(warehouse=w_to, reference=code)
-        
+
         stock_parser = self.stock_parser(
                                         quantity_to_transfer,
                                         delete=False)
@@ -564,7 +795,7 @@ class PrestaRequest:
         if stock_parser:
             add_bikes = self.presta_put()
 
-            if request_url_to and add_bikes != None:
+            if request_url_to and add_bikes is not None:
                 get_to_q = self.warehouse_quantity_mgmt(
                     warehouse=None,
                     quantity_to_transfer=quantity_to_transfer,
@@ -573,13 +804,13 @@ class PrestaRequest:
                     delete=False
                     )
                 
-                print(get_to_q)
 
                 if get_to_q:
                     update_warehouse = self.presta_put(request_url=get_to_q)
+                
 
 
-        if add_bikes != None and update_warehouse != None:
+        if add_bikes is not None and update_warehouse is not None:
             self.w_to = w_to
             
             response_data = {
@@ -588,10 +819,195 @@ class PrestaRequest:
                 'quantity': str(self.total_quantity),
                 'w_from': str(self.w_from),
                 'w_to': str(self.w_to),
-                'date': str(self.date)
+                'date': str(self.date),
+                'restore_token': self.restore_id
             }
 
             return response_data
 
         else:
-            return {'error': 'Unable to mooving products!'}
+            return_error = {
+                "error": "Unable to mooving products!",
+                "name": str(self.name)
+            }
+
+            return return_error
+
+
+    # Set up default combination if it has the lowest quantity or 0
+    # Func takes comb_id for combination which will be setting up as default
+    def set_default_combination(self, comb_id, value, check=True) -> bool:
+        if comb_id is None:
+            return False
+
+        comb_url = requests.get(MAIN_COMBINATIONS_URL + comb_id, auth=(self.api_secret_key, ''))
+
+        if comb_url.status_code != 200:
+            return False
+        
+        # Check default field
+        get_default_field = self.get_ps_xml_tag(
+            content=comb_url.content,
+            tag='default_on',
+            find_all=False
+        )
+
+
+        if check:
+            if get_default_field.text is None: return False
+            if get_default_field.text: return True
+        
+
+        # If default_on field != 1? than combination is not default
+        if not check:
+            # Set up combination default_on at 1
+            self.activity_reponse(
+                comb_url.content,
+                tag="default_on",
+                value=value
+            )
+
+            # Update product
+            put_combination = self.presta_put(request_url=MAIN_COMBINATIONS_URL+comb_id)
+
+            if put_combination.get("success") is not None:
+                return True
+
+        return False
+            
+
+    # Using only in App classes for getting data for initializing
+    def get_init_data(self, code):
+        self.request_url = f"https://3gravity.pl/api/combinations/?filter[reference]=%[{code}]%"
+        get_params = self.get_product_url()
+
+
+        if isinstance(get_params, str):
+            product_card = requests.get(get_params,auth=(self.api_secret_key, ''))
+
+            if product_card.status_code != 200:
+                return {"error": "Product url is invalid"}
+
+            assoc_tag = self.get_ps_xml_tag(
+            content=product_card.content,
+            tag='associations',
+            find_all=False
+            )
+
+            p_comb_id = assoc_tag.find('combinations')
+            comb_dict = []
+
+            for i in range(len(p_comb_id)):
+                comb_dict.append(p_comb_id[i].find('id').text)
+            
+            if len(comb_dict) > 0:
+                product_dict = {
+                    get_params[-4:]: comb_dict
+                }
+
+                return product_dict
+
+        else:
+            return get_params
+
+
+    # Save history to json
+    def restore_write_json(self, stock_url, xml_data):
+        xml_value = []
+
+        try:
+            with open(f"{self.base_dir}/AP/restore/session/restore.json", "r") as json_object:
+                data = json.load(json_object)
+
+        
+        except Exception as e:
+            data = {}
+        
+
+        if data.get(self.restore_id) is None:
+            xml_value.append(xml_data)
+            data.update({self.restore_id: {stock_url: xml_value}})
+        
+        else:
+            existing_data = data.get(self.restore_id)
+            value_check = existing_data.get(stock_url)
+            
+            if value_check is None:
+                xml_value.append(xml_data)
+                existing_data.update({stock_url: xml_value})
+            
+            else:
+                value_check.append(xml_data)
+                existing_data.update({stock_url: value_check})
+
+            data.update({self.restore_id: existing_data})
+
+            # Set privious dick history key as "yes"
+            data_history_set = list(data.keys())
+
+            if len(data_history_set) >= 2:
+                update_by_key = data_history_set[-2]
+
+                data.get(update_by_key).update({"history": "yes"})
+
+
+        with open(f"{self.base_dir}/AP/restore/session/restore.json", "w") as json_object:
+            json.dump(data, json_object, indent=4)
+
+        return None
+
+
+    # Delete all not filterable fields from xml string/document
+    def not_filterable_delete(self, content):
+        if content is None:
+            return ""
+
+        xml_content = ET.fromstring(content)
+        general_tag = xml_content[0]
+
+        # Not filterable delete
+        not_filter_tags = []
+            
+        for not_filter in general_tag:
+            if not_filter.get('notFilterable') == 'true':
+                not_filter_tags.append(not_filter)
+
+        for i in not_filter_tags:
+            general_tag.remove(i)
+            
+        format_xml_tree = ET.tostring(xml_content, encoding="utf-8")
+
+        return format_xml_tree
+
+
+    # Restore last action. Restore token must be received from success "update" request
+    # All of dicts in retore.json will be marked as "history" after succeed "restore" request
+    def restore_last_action(self, restore_id):
+        data = None
+
+        with open(f"{self.base_dir}/AP/restore/session/restore.json", "r") as json_object:
+            data = json.load(json_object)
+
+        if data is None:
+            return {"error": "Unable to cancle action!"}
+        
+        data_dict = data.get(restore_id)
+
+
+        if data_dict.get("history") is None:
+            for key, value in data_dict.items():
+                for r in value:
+                    resp_data = self.not_filterable_delete(r)
+                    self.presta_put(response_data=resp_data, request_url=key)
+
+            data_dict.update({"history": "yes"})
+
+            with open(f"{self.base_dir}/AP/restore/session/restore.json", "w") as json_object:
+                json.dump(data, json_object, indent=4)
+
+        return {'OK': 'OK'}
+
+        
+
+
+

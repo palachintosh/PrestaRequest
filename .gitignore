@@ -3,6 +3,15 @@
 *.pyc
 stockctl.py
 __pycache__/
+*.log
+*.json
 
 log/*.*
 temp/*.*
+AP/__pycache__/
+AP/reset
+AP/stat
+AP/restore/
+AP/logs/
+AP/json_log/
+AP/auth_data.py

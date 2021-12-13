@@ -1,0 +1,183 @@
+# The stock manager class
+# Findes all of availables war stocks and
+# edits them if need
+
+
+from datetime import datetime
+from mainp.api_secret_key import api_secret_key
+from .auth_data import MAIN_STOCK_URL
+from .products_api import ProductApi
+from .AdminParser import AdminParser
+import requests
+import json
+
+
+
+class StocksWorker(AdminParser, ProductApi):
+    
+    impossible_to_add: dict
+    operation_status = None
+    stock_url = MAIN_STOCK_URL
+    stock_xml_urls = []
+
+    product_id = comb_id = stock_id = None
+
+
+    # Func checks if stock available in warehouse and return boolean value
+    def stock_finder(self, comb_id=None) -> int:
+        self.stock_xml_urls = []
+        self.comb_id = comb_id
+
+        get_stock_list = requests.get(
+                self.stock_url + f'?filter[id_product_attribute]={self.comb_id}',
+                auth=(api_secret_key, ''))
+        
+        stock_xml_data = self.get_ps_xml_tag(
+            content=get_stock_list.content,
+            tag='stock')
+        
+        # Wtite stocks in self var
+        for i in stock_xml_data:
+            self.stock_xml_urls.append(i.get('id'))
+            
+        
+        # If returned value has 3 stocks -
+        # just return True, cause thats ok for regular product.
+        if len(self.stock_xml_urls) == 3:
+            return 3
+        
+        # Make returne value availables inside class
+        if len(stock_xml_data) > 0:
+            return len(self.stock_xml_urls)
+
+
+    # Check, does this stock available or not
+    def stock_war_values_checker(self):
+        if self.rs is None:
+            self.auth()
+
+            if self.status != 200:
+                return f"Auth data is invalid or sever does not respond! {self.status}"
+
+
+        stocks = len(self.stock_xml_urls)
+        if stocks >= 0:
+            return self.stock_init_all()
+
+
+    def stock_add_first(self):
+        # First of all, we must add product on first stock in SHOP war.
+        add_product = self.adn_add_stock(id_product=self.product_id, comb_id=self.comb_id)
+
+        # Update stocks
+        self.stock_finder(self.comb_id)
+
+        if add_product.get('status') == 'OK' and len(self.stock_xml_urls) != 0:
+            return True
+
+        return False
+
+
+    def imposible_var_log(self):
+        if self.impossible_to_add.get(self.product_id) is None:
+            self.impossible_to_add.update({
+                    self.product_id: [self.comb_id]
+                })
+
+        else:
+            get_comb = self.impossible_to_add.get(self.product_id)
+            get_comb.append(self.comb_id)
+
+            self.impossible_to_add.update({
+                self.product_id: get_comb
+            })
+        
+        with open("logs/impossible_.json", "w") as f:
+            json.dump(self.impossible_to_add, f)
+
+
+    # If noone is available - init them using AdminParser finctional
+    def stock_init_all(self, first_init=False):
+        if not first_init:
+            first_step = self.stock_add_first()
+
+            if not first_step:
+                self.imposible_var_log()
+
+                return False
+        
+    
+        if len(self.stock_xml_urls) > 0:
+            transfer = True
+
+            for war_id in range(5, 7):
+                if transfer:
+                    stock_for_next_transfer = self.stock_shop_finder(str(war_id-1))
+                    
+                    transfer_stock = self.adn_transfer_stock(
+                        id_stock=stock_for_next_transfer,
+                        id_product=self.product_id,
+                        comb_id=self.comb_id,
+                        id_war_to=war_id,
+                        )
+                    
+                    self.stock_finder(self.comb_id)
+
+                    if transfer_stock.get('status') != 'OK':
+                        transfer = False
+                        self.imposible_var_log()
+                        break
+
+            if transfer:
+                stock_for_remove = self.stock_shop_finder('6')
+
+                if not stock_for_remove is None:
+                    remove_stock = self.adn_remove_stock(
+                        id_stock=stock_for_remove,
+                        id_product=self.product_id,
+                        comb_id=self.comb_id,
+                        id_warehouse=6
+                        )
+                    
+                    if remove_stock.get('status') == 'OK':
+                        return True
+        
+        self.imposible_var_log()
+        return None
+
+
+    def stock_shop_finder(self, war_id):
+        if not self.stock_xml_urls is None and len(self.stock_xml_urls) > 0:
+            for stock in self.stock_xml_urls:
+                stock_get_warehouse = requests.get(
+                    self.stock_url + stock,
+                    auth=(api_secret_key, ''))
+                
+                if stock_get_warehouse.status_code == 200:
+                    # Get warehouse id from id_warehouse tag
+                    stock_warehouse_id = self.get_ps_xml_tag(
+                        content=stock_get_warehouse.content,
+                        tag='id_warehouse', find_all=False)
+                
+                    if stock_warehouse_id.text == war_id:
+                        return stock
+        
+        return None
+
+
+
+
+# if __name__ == "__main__":
+#     sw = StocksWorker(login=AUTH_DATA[0], password=AUTH_DATA[1])
+#     sw.product_id = 2701
+
+#     stock_checker = sw.stock_finder(comb_id=8507)
+
+#     if stock_checker != 3:
+#         init_stocks = sw.stock_war_values_checker()
+
+#         print(init_stocks)
+#     else:
+#         print(stock_checker)
+
+

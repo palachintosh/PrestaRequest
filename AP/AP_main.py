@@ -79,16 +79,12 @@ class APStockWorker(StocksWorker):
             self.sw_file_object()
             if not self.file_object:
                 return {"error": "File not found!"}
-        
+
         else:
             self.file_object = {product_id: comb_list}
 
 
-        terminal_size = os.get_terminal_size().columns
-        array_len = len(self.file_object)
-        counter = 1
-
-        self.logger.warning("SYCLE: " + str(self.file_object) + str(product_id) + str(comb_list))
+        self.logger.warning("CYCLE: " + str(self.file_object) + str(product_id) + str(comb_list))
     
         # Parsing file or dict
         for product_id, comb_list in self.file_object.items():
@@ -100,25 +96,6 @@ class APStockWorker(StocksWorker):
                 
                 ap_response_status.update(attempt_resp)
                 sleep(1)
-
-                # Add loader for visualizanion process
-                # ------------------------------------
-                current_proc = 100 / (array_len / counter)
-
-                if int(current_proc) >= 2 and int(current_proc) <= 100:
-                    str_tag = int(current_proc / 2)
-                    current_proc = "{}".format(current_proc)
-
-                    if terminal_size > 91:
-                        loading_str = "Loading: [_" + "#"*str_tag + "_"*(50-str_tag) + "_]" + " {} / 100%".format(current_proc)
-                        
-                    else:
-                        loading_str = "Loading: [ {} / 100% ]".format(current_proc)
-                        print(loading_str, end='\r')
-
-            counter += 1
-            
-        print('\n', 'Loading completed..')
 
         return ap_response_status
 
@@ -134,6 +111,7 @@ class APStockWorker(StocksWorker):
 
         # Launch main stock_finder function with comb_id param
         stock_checker = self.stock_finder(comb_id=str(comb_id))
+        
 
         # If stock count == 3 return dict with success
         # Else try to init stocks on warehouses
@@ -146,16 +124,40 @@ class APStockWorker(StocksWorker):
                 ap_response_status.update({
                     "error": init_stocks
                 })
+
                 return ap_response_status
             
             log_str = "Product {} with comb. {} was added.".format(self.product_id, comb_id)
             self.logger.info(log_str)
             ap_response_status.update({"success": log_str})
 
+
         else:
-            log_str = "Product {} with comb. {} already exists.".format(self.product_id, comb_id)
-            self.logger.debug(log_str)
-            ap_response_status.update({"success": log_str})
+            if stock_checker == 3:
+                # Need to check the quantity of references in combination.
+                # If this > 1 - init stocks in "force" mode.
+                references_array = self.stock_ref_checker(comb_id=self.comb_id)
+
+                if references_array:
+                    log_str = "Product {} with comb. {} already exists.".format(self.product_id, comb_id)
+                    self.logger.debug(log_str)
+                    ap_response_status.update({"success": log_str})
+
+                else:
+                    init_stocks = self.stock_war_values_checker()
+
+                    if isinstance(init_stocks, str):
+                        self.logger.error(init_stocks)
+                        
+                        ap_response_status.update({
+                            "error": init_stocks
+                        })
+                        
+                        return ap_response_status
+
+                    log_str = "Product {} with comb. {} already exists, but has >1 reference code.".format(self.product_id, comb_id)
+                    self.logger.debug(log_str)
+                    ap_response_status.update({"success": log_str})
 
 
         return ap_response_status

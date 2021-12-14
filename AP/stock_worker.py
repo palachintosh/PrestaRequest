@@ -4,11 +4,11 @@
 
 
 from datetime import datetime
-from os import remove
 
 from django.views.generic import base
+from requests.models import get_auth_from_url
 from mainp.api_secret_key import api_secret_key
-from .auth_data import MAIN_STOCK_URL
+from .auth_data import MAIN_STOCK_URL, MAIN_COMBINATIONS_URL
 from .products_api import ProductApi
 from .AdminParser import AdminParser
 import requests
@@ -24,17 +24,18 @@ class StocksWorker(AdminParser, ProductApi):
     operation_status = None
     stock_url = MAIN_STOCK_URL
     stock_xml_urls = []
+    ref_array = None
 
     product_id = comb_id = stock_id = None
 
 
     formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
     base_sw_dir = os.path.dirname(os.path.abspath(__file__))
-    file_handler = logging.FileHandler(base_sw_dir + "/logs/stock_worker.log")
-    logger = logging.getLogger('stock_worker_log')
-    logger.setLevel(logging.DEBUG)
+    file_handler = logging.FileHandler(base_sw_dir + "/logs/SW.log")
+    sw_logger = logging.getLogger('stock_worker_log.stock_logger')
+    sw_logger.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    sw_logger.addHandler(file_handler)
 
 
     # Func checks if stock available in warehouse and return boolean value
@@ -58,11 +59,14 @@ class StocksWorker(AdminParser, ProductApi):
         # If returned value has 3 stocks -
         # just return True, cause thats ok for regular product.
         if len(self.stock_xml_urls) == 3:
+            self.sw_logger.info("STOCKS FOR EXISTING PRODUCT: " + str(self.stock_xml_urls))
             return 3
         
         # Make returne value availables inside class
         if len(stock_xml_data) > 0:
             return len(self.stock_xml_urls)
+        
+        return 0
 
 
     # Check, does this stock available or not
@@ -71,12 +75,11 @@ class StocksWorker(AdminParser, ProductApi):
             self.auth()
 
             if self.status != 200:
-                self.logger.critical("Auth data is invalid or sever does not respond! {}".format(self.status))
-                return "Auth data is invalid or sever does not respond! {}".format(self.status)
+                self.sw_logger.critical("Invalid auth data or sever doesn't respond! " + str(self.status))
+                return "Invalid auth data or sever doesn't respond! {}".format(self.status)
 
 
         stocks = len(self.stock_xml_urls)
-        self.logger.info("Stocks_len: " + str(self.stock_xml_urls))
 
         if stocks >= 0:
             return self.stock_init_all()
@@ -89,7 +92,7 @@ class StocksWorker(AdminParser, ProductApi):
         # Update stocks
         self.stock_finder(self.comb_id)
 
-        self.logger.info(str(add_product))
+        self.sw_logger.info(str(add_product))
 
         if add_product.get('status') == 'OK' and self.stock_xml_urls:
             return True
@@ -102,8 +105,6 @@ class StocksWorker(AdminParser, ProductApi):
 
         base_imposible_dir = os.path.dirname(os.path.abspath(__file__))
 
-        self.logger.error(base_imposible_dir)
-        
         if self.impossible_to_add.get(self.product_id) is None:
             self.impossible_to_add.update({
                     self.product_id: [self.comb_id]
@@ -126,15 +127,10 @@ class StocksWorker(AdminParser, ProductApi):
         if not first_init:
             first_step = self.stock_add_first()
 
-            self.logger.info(str(first_init))
-            self.logger.info(str(first_step))
-
             if not first_step:
                 self.imposible_var_log()
 
                 return False
-        
-        self.logger.info(str(self.stock_xml_urls))
 
         if len(self.stock_xml_urls) > 0:
             transfer = True
@@ -150,11 +146,10 @@ class StocksWorker(AdminParser, ProductApi):
                         id_war_to=war_id,
                         )
                     
-                    self.logger.warning(str(transfer_stock))
-                    
                     self.stock_finder(self.comb_id)
 
                     if transfer_stock.get('status') != 'OK':
+                        self.sw_logger.error("ERROR WHILE TRANSFER: " + str(transfer_stock))
                         transfer = False
                         self.imposible_var_log()
                         break
@@ -170,19 +165,17 @@ class StocksWorker(AdminParser, ProductApi):
                         id_warehouse=6
                         )
                     
-                    self.logger.warning(str(remove_stock))
-                    
                     if remove_stock.get('status') == 'OK':
                         return True
         
+                    self.sw_logger.error("ERROR WHILE REMOVE: " + str(transfer_stock))
+
         self.imposible_var_log()
         return None
 
 
     def stock_shop_finder(self, war_id):
         if not self.stock_xml_urls is None and len(self.stock_xml_urls) > 0:
-            self.logger.warning(str(self.stock_xml_urls))
-            
             for stock in self.stock_xml_urls:
                 stock_get_warehouse = requests.get(
                     self.stock_url + stock,
@@ -198,5 +191,31 @@ class StocksWorker(AdminParser, ProductApi):
                         return stock
         
         return None
+
+
+    def stock_ref_checker(self, comb_id) -> bool:
+        get_ref_page = requests.get(
+                    MAIN_COMBINATIONS_URL + str(self.comb_id),
+                    auth=(api_secret_key, ''))
+
+
+        if get_ref_page.status_code == 200:
+            reference_str = self.get_ps_xml_tag(
+                content=get_ref_page.content,
+                tag="reference",
+                find_all=False
+            )
+
+            if reference_str.text:
+                self.ref_array = reference_str.text.split(' ')
+
+                if len(self.ref_array) == 1:
+                    return True
+                
+                else:
+                    return False
+        
+        return False
+            
 
 

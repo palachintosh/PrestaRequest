@@ -22,6 +22,9 @@ class HtmlFormParser:
         # Find form in response html
         root_form = soup.find('form', id="product_form")
 
+        if root_form is None:
+            return None
+
         self.action = root_form.attrs["action"]
 
         return None if self.action is None else self.get_form_data(root_form)

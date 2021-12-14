@@ -894,7 +894,6 @@ class PrestaRequest:
         self.request_url = "https://3gravity.pl/api/combinations/?filter[reference]=%[{}]%".format(code)
         get_params = self.get_product_url()
 
-
         if isinstance(get_params, str):
             product_card = requests.get(get_params,auth=(self.api_secret_key, ''))
 

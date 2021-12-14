@@ -19,10 +19,10 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
     formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
     base_sw_dir = os.path.dirname(os.path.abspath(__file__))
     file_handler = logging.FileHandler(base_sw_dir + "/logs/adn_parser.log")
-    logger = logging.getLogger('adn_parser')
-    logger.setLevel(logging.DEBUG)
+    adn_logger = logging.getLogger('stock_worker_log.adn_logger')
+    adn_logger.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    adn_logger.addHandler(file_handler)
 
 
     def __init__(self, login, password):
@@ -32,18 +32,16 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
         self.adn_form_url = ADN_FORM_URL
 
         self.warehouses = ID_WAREHOUSES
-    
+
 
     # Post request in stocks by admin !NOT API!
     def _w_post_request(self, request_data):
         # Make the post request on StockManagement
         main_url = MAIN_ADN_LINK + self.action
-
         add_post_req = self.rs.post(main_url, data=request_data)
-
-        self.logger.info("W_post_request" + str(add_post_req.status_code))
-
         self.status = add_post_req.status_code
+
+        self.adn_logger.info("w_post_request: " + str(add_post_req.status_code))
 
         if self.status == 200:
             return {'status': 'OK'}
@@ -67,10 +65,10 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
             'redirect': '127b7b8242e9acfe2138fa9d2d3dfa5d'
         }
 
-        self.logger.info("Auth data: " + str(data))
-
         auth_request = self.rs.post(MAIN_ADN_LINK + "ajax-tab.php", data=data)
         self.status = auth_request.status_code
+
+        self.adn_logger.info("AUTH STATUS CODE: " + str(self.status))
 
 
 #============= Work with available stocks =============
@@ -85,7 +83,6 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 stock_mvt_event=event
                 )
 
-        self.logger.debug("GET_FORM " + str(get_form))
         return get_form
 
 
@@ -98,8 +95,6 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
         # Make attempt to get_form
         mvt_attempt = self.mvmt_product_mixin(mvmt_event='add')
 
-        self.logger.info("ADN_STOCK_ADD: " + str(mvt_attempt))
-
         if mvt_attempt.status_code == 200:
             # from_war_id always eq. 4 (SHOP)
             pd = self.post_data_collector(
@@ -107,20 +102,16 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 from_war_id=4,
                 event='add')
 
-            self.logger.warning(str(pd))
 
             if not pd is None:
-                # confirm_post = input("All data was colected! Do you wanna POST? Yes/any: ")
-                # if confirm_post == 'Yes':
-                
                 add_post = self._w_post_request(pd)
                 if add_post.get('status') == "OK":
                     return add_post
 
-                else:
-                    return {'error': 'FAIL'}
         
-        return mvt_attempt.status_code
+        else:
+            return {'error': 'FAIL'}
+
 
         
     # Remove one position from stocks
@@ -131,30 +122,24 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
 
         mvt_attempt = self.mvmt_product_mixin(mvmt_event='remove')
 
-        self.logger.info(str(mvt_attempt))
-
         if mvt_attempt.status_code == 200:
             pd = self.post_data_collector(
                 form_response=mvt_attempt.text,
                 from_war_id=id_warehouse,
                 event='remove')
 
-            self.logger.warning(str(pd))
-            
+
             if not pd is None:
-                print(pd)
-                # confirm_post = input("All data was colected! Do you wanna POST? Yes/any: ")
-                # if confirm_post == 'Yes':
-                #     return self._w_post_request(pd)
                 remove_post = self._w_post_request(pd)
                 
                 if remove_post.get('status') == "OK":
                     return remove_post
 
-                else:
-                    return {'error': 'FAIL'}
 
-        return mvt_attempt.status_code
+        else:
+            return {'error': 'FAIL'}
+
+
 
     # Transfer position between stocks
     def adn_transfer_stock(self, id_stock, id_product, comb_id, id_war_to):
@@ -165,16 +150,12 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
 
         mvt_attempt = self.mvmt_product_mixin(mvmt_event='transfer')
 
-        self.logger.info(str(mvt_attempt))
-
         if mvt_attempt.status_code == 200:
             pd = self.post_data_collector(
                 form_response=mvt_attempt.text,
                 from_war_id=id_war_to,
                 event='transfer'
             )
-            
-            self.logger.warning(str(pd))
 
             if not pd is None:
                 # Removing unusable values
@@ -190,10 +171,9 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 if transfer_post.get('status') == "OK":
                     return transfer_post
 
-                else:
-                    return {'error': 'FAIL'}
-        
-        return mvt_attempt.status_code
+
+        else:
+            return {'error': 'FAIL'}
 
 
 #============= Ending work with available stocks =============

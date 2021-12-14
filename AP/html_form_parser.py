@@ -7,8 +7,8 @@ from bs4 import BeautifulSoup
 
 
 class HtmlFormParser:
-    request_data: dict
-    action: str
+    request_data = {}
+    action = ""
 
 
     def __init__(self, html_object, stock_mvt_event=None):

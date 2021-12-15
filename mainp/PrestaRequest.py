@@ -257,13 +257,16 @@ class PrestaRequest:
                     kwargs=request_data)
                 
                 if product_url is not None:
-                    return product_url.get('product_link')
+                    pu = product_url.get('product_link')
+                    
+                    if pu is not None:
+                        return pu 
                 
             else:
-                return get_product_link_from_comb.status_code
+                return {'error': 'Status code: {}'.format(get_product_link_from_comb.status_code)}
         
-        else:
-            return {'error': 'Product does not exit in the stocks!'}
+
+        return {'error': 'Product does not exit in the stocks!'}
 
 
     def get_product_stocks_url(self, request_url=None):
@@ -273,9 +276,8 @@ class PrestaRequest:
         
         if request_url == None:
             get_product_link = self.get_product_url()
-            try:
-                str(get_product_link)
-            except:
+            
+            if not isinstance(get_product_link, str):
                 get_product_link.get('error')
                 response_data = {
                     'error': get_product_link.get('error')
@@ -439,7 +441,7 @@ class PrestaRequest:
         else:
             mgmt_var = -1
 
-        if len(stock_list) != 0:
+        if stock_list:
             
             self.stock_list = stock_list
             # Stocks parsing
@@ -898,7 +900,8 @@ class PrestaRequest:
             product_card = requests.get(get_params,auth=(self.api_secret_key, ''))
 
             if product_card.status_code != 200:
-                return {"error": "Product url is invalid"}
+                # return {"error": "Product url is invalid"}
+                return None
 
             assoc_tag = self.get_ps_xml_tag(
             content=product_card.content,
@@ -919,8 +922,8 @@ class PrestaRequest:
 
                 return product_dict
 
-        else:
-            return get_params
+        
+        return None
 
 
     # Save history to json
@@ -1002,9 +1005,11 @@ class PrestaRequest:
 
         if data is None:
             return {"error": "Unable to cancle action!"}
-        
+
         data_dict = data.get(restore_id)
 
+        if data_dict is None:
+            return {"error": "Unable to cancle action!"}
 
         if data_dict.get("history") is None:
             for key, value in data_dict.items():

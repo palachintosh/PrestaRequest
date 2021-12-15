@@ -109,8 +109,8 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                     return add_post
 
         
-        else:
-            return {'error': 'FAIL'}
+
+        return {'error': 'FAIL'}
 
 
         
@@ -136,8 +136,8 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                     return remove_post
 
 
-        else:
-            return {'error': 'FAIL'}
+        
+        return {'error': 'FAIL'}
 
 
 
@@ -171,9 +171,7 @@ class AdminParser(PrestaRequest, HtmlFormParser, APMvmtMixin):
                 if transfer_post.get('status') == "OK":
                     return transfer_post
 
-
-        else:
-            return {'error': 'FAIL'}
+        return {'error': 'FAIL'}
 
 
 #============= Ending work with available stocks =============

@@ -72,27 +72,31 @@ class APStockWorker(StocksWorker):
             return None
         
 
-    def sw_main_cycle(self, product_id=None, comb_list=None, use_file=False):
+    def sw_main_cycle(self, product_id=None, comb_list=None, use_file=False, force=False):
         ap_response_status = {}
 
         if use_file:
             self.sw_file_object()
             if not self.file_object:
-                return {"error": "File not found!"}
-
+                ap_response_status.update({"error": "File not found!"})
+                return ap_response_status
         else:
             self.file_object = {product_id: comb_list}
-
+        
+        if self.file_object is None:
+            ap_response_status.update({'error': 'Unable to parse selected product!'})
+            return ap_response_status
+        
 
         self.logger.warning("CYCLE: " + str(self.file_object) + str(product_id) + str(comb_list))
     
         # Parsing file or dict
         for product_id, comb_list in self.file_object.items():
             for comb_id in comb_list:
-
                 attempt_resp = self.stock_checker(
                     comb_id=comb_id,
-                    product_id=product_id)
+                    product_id=product_id,
+                    force=force)
                 
                 ap_response_status.update(attempt_resp)
                 sleep(1)
@@ -103,7 +107,7 @@ class APStockWorker(StocksWorker):
     # In manual mode function parsing try to init products form json file
     # Also, I can run this for ONE selected product calling this from custom
     # product_in and comb_id
-    def stock_checker(self, comb_id, product_id):
+    def stock_checker(self, comb_id, product_id, force=False):
         ap_response_status = {}
         
         # Init product id inside class
@@ -136,9 +140,10 @@ class APStockWorker(StocksWorker):
             if stock_checker == 3:
                 # Need to check the quantity of references in combination.
                 # If this > 1 - init stocks in "force" mode.
-                references_array = self.stock_ref_checker(comb_id=self.comb_id)
+                # references_array = self.stock_ref_checker(comb_id=self.comb_id)
+                # if forse
 
-                if references_array:
+                if not force:
                     log_str = "Product {} with comb. {} already exists.".format(self.product_id, comb_id)
                     self.logger.debug(log_str)
                     ap_response_status.update({"success": log_str})
@@ -155,7 +160,7 @@ class APStockWorker(StocksWorker):
                         
                         return ap_response_status
 
-                    log_str = "Product {} with comb. {} already exists, but has >1 reference code.".format(self.product_id, comb_id)
+                    log_str = "Product {} with comb. {} exists, but was updated in force mode.".format(self.product_id, comb_id)
                     self.logger.debug(log_str)
                     ap_response_status.update({"success": log_str})
 

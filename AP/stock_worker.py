@@ -195,7 +195,7 @@ class StocksWorker(AdminParser, ProductApi):
 
     def stock_ref_checker(self, comb_id) -> bool:
         get_ref_page = requests.get(
-                    MAIN_COMBINATIONS_URL + str(self.comb_id),
+                    MAIN_COMBINATIONS_URL + str(comb_id),
                     auth=(api_secret_key, ''))
 
 
@@ -205,17 +205,19 @@ class StocksWorker(AdminParser, ProductApi):
                 tag="reference",
                 find_all=False
             )
+            try:
+                if reference_str.text:
+                    self.ref_array = reference_str.text.split(' ')
 
-            if reference_str.text:
-                self.ref_array = reference_str.text.split(' ')
+                    if len(self.ref_array) == 1:
+                        # return True -> if there is only one reference
+                        return False
+                    
+                    else:
+                        return False
 
-                if len(self.ref_array) == 1:
-                    return True
-                
-                else:
-                    return False
-        
-        return False
+            except:
+                return False
             
 
 

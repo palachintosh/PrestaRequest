@@ -487,7 +487,7 @@ class PrestaRequest:
                         else:
                             total_q = int(self.quantity) + mgmt_var
 
-                            if total_q <= 0:
+                            if total_q < 0:
                                 return {'error': 'Total quantity is equal 0'}
 
                             self.xml_response_create(new_quantity=total_q, comb_check=True)

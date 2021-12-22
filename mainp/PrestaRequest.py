@@ -1,4 +1,5 @@
 from json import load
+from os import get_inheritable
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import ElementTree
 from .var import *
@@ -485,6 +486,10 @@ class PrestaRequest:
 
                         else:
                             total_q = int(self.quantity) + mgmt_var
+
+                            if total_q <= 0:
+                                return {'error': 'Total quantity is equal 0'}
+
                             self.xml_response_create(new_quantity=total_q, comb_check=True)
 
                             return total_q
@@ -518,7 +523,7 @@ class PrestaRequest:
             xml_content = ET.fromstring(get_stock_xml.content)  # Create ET instanse and root tag
             general_tag = xml_content[0]  # Get prestashop tag
             tag = general_tag.find('quantity')
-
+ 
             tag.text = str(new_quantity)
             tag.set('update', 'yes')
 
@@ -651,6 +656,7 @@ class PrestaRequest:
             # Get warehouse quantity and remove one
             get_physical_quantity = general_product.find('physical_quantity')
             get_usable_quantity = general_product.find('usable_quantity')
+
 
             if zero_quantity:
                 if int(get_physical_quantity.text) != 0:

@@ -585,7 +585,7 @@ class PrestaRequest:
                 find_all=True
             )
 
-            if get_stock_url is None:
+            if not get_stock_url:
                 return "Product does not exist!"
 
 
@@ -809,10 +809,22 @@ class PrestaRequest:
         # Get link product on warehouse
         request_url_to = self.stock_control(warehouse=w_to, reference=code)
 
+
         stock_parser = self.stock_parser(
                                         quantity_to_transfer,
                                         delete=False)
+
         
+        # Changed 13.01.2021
+
+        if ((request_url_to == "Product does not exist!") or (request_url_to is None)) and stock_parser:
+            return_error = {
+                "error": "Produkt z kodem {} istnieje ale nie jest aktywny na magazynie. Sprobuj akwywowac go.".format(code),
+            }
+
+            return return_error
+
+
         if stock_parser:
             add_bikes = self.presta_put()
 

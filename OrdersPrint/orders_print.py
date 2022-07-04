@@ -342,6 +342,12 @@ class OrdersPrint(PrestaRequest):
             file_name = 'orders-{}.pdf'.format(datetime.today().date())
             card_path = os.path.join(self.base_dir, 'print/' + file_name)
         
+        self.op_logger.info("===================================")
+        self.op_logger.info("TO PDF, card path: " + str(card_path))
+
+
+        self.op_logger.info(str(os.path.join(self.base_dir, 'OrdersPrint/DejaVuSans.ttf')))
+        
     
         class PDF(FPDF):
             def header(self):

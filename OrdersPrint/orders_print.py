@@ -1,15 +1,18 @@
 import sys
-# sys.path.insert(0, '..')
-sys.path.append('/home/palachintosh/projects/mysite/mysite/bikes_monitoring/PrestaRequest/')
+sys.path.insert(0, '..')
+# sys.path.append('/home/palachintosh/projects/mysite/mysite/bikes_monitoring/PrestaRequest/')
+
 
 from mainp.PrestaRequest import PrestaRequest
 from mainp.var import MAIN_API_URL
-from mainp.api_secret_key import api_secret_key
+#from mainp.api_secret_key import api_secret_key
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import ElementTree
 from fpdf import FPDF
 from datetime import date, timedelta, datetime
 import os
+
+import logging
 
 import requests
 
@@ -19,6 +22,16 @@ class OrdersPrint(PrestaRequest):
     not_acceptable_order_states = ['4', '5', '6', '7', '8', '9', '13']
     total_bikes_to_pickup = 0
     ev_orders_products = []
+
+
+    formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
+    base_op_dir = os.path.dirname(os.path.abspath(__file__))
+    file_handler = logging.FileHandler(base_op_dir + "/orders_print.log")
+    op_logger = logging.getLogger('stock_worker_log.stock_logger')
+    op_logger.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    op_logger.addHandler(file_handler)
+
 
     def get_orders_by_date(self, orders_url):
         get_orders = requests.get(orders_url, auth=(self.api_secret_key, ''))
@@ -36,12 +49,18 @@ class OrdersPrint(PrestaRequest):
 
 
     def get_orders_by_id(self, orders_url) -> dict:
+        self.op_logger.info("GET ORDERS BY ID: " + str(orders_url))
         get_orders = requests.get(orders_url, auth=(self.api_secret_key, ''))
+
+        self.op_logger.info("COLLECT_BY LIMIT. STATUS: " + str(get_orders.status_code))
+        self.op_logger.info("COLLECT_BY LIMIT: " + str(get_orders.text))
 
         if get_orders.status_code == 200:
             orders_collected_list = self.parse_orders(get_orders.content, date_prefix=True)
+            self.op_logger.info("COLLECTED LIST _1: " + str(orders_collected_list))
         
             if orders_collected_list and not isinstance(orders_collected_list, str):
+                self.op_logger.info("COLECTED_ LIST: " + str(orders_collected_list))
                 return orders_collected_list
             
             if isinstance(orders_collected_list, str):
@@ -55,6 +74,7 @@ class OrdersPrint(PrestaRequest):
             int(limit_id_start)
             int(limit_id_end)
         except:
+            self.op_logger.info("COLLECT_BY LIMIT IN EXCEPT: " + str(limit_id_start) + str(limit_id_end))
             return None
         
         orders_url = MAIN_API_URL + 'orders/?filter[id]=[{},{}]'.format(limit_id_start, limit_id_end)
@@ -64,6 +84,10 @@ class OrdersPrint(PrestaRequest):
             self.orders_list = daily_orders
 
             return self.orders_list
+
+        self.op_logger.info("COLLECT_BY LIMIT: " + str(orders_url))
+        self.op_logger.info("COLLECT_BY LIMIT: " + str(daily_orders))
+        self.op_logger.info("COLLECT_BY LIMIT: " + str(self.orders_list))
 
         return None
 
@@ -285,6 +309,7 @@ class OrdersPrint(PrestaRequest):
                         self.make_with_prefix(start_str, daily_orders)
                     )
 
+        self.op_logger.info("PARSE ORDERS: " + str(daily_orders))
         return daily_orders
 
 

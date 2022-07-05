@@ -23,11 +23,25 @@ class OrdersPrint(PrestaRequest):
     total_bikes_to_pickup = 0
     ev_orders_products = []
 
+
+    formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
+    base_op_dir = os.path.dirname(os.path.abspath(__file__))
+    file_handler = logging.FileHandler(base_op_dir + "/orders_print.log")
+    op_logger = logging.getLogger('stock_worker_log.stock_logger')
+    op_logger.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    op_logger.addHandler(file_handler)
+
+
     def get_orders_by_date(self, orders_url):
         get_orders = requests.get(orders_url, auth=(self.api_secret_key, ''))
+        self.op_logger.info(str(get_orders.status_code) + ', ' + orders_url)
+        self.op_logger.info(str(get_orders.content))
 
         if get_orders.status_code == 200:
             orders_collected_list = self.parse_orders(get_orders.content)
+
+            self.op_logger.info("ORDERS BY ID LIST: ", str(orders_collected_list))
             
             if orders_collected_list and not isinstance(orders_collected_list, str):
                 return orders_collected_list
@@ -40,9 +54,13 @@ class OrdersPrint(PrestaRequest):
 
     def get_orders_by_id(self, orders_url) -> dict:
         get_orders = requests.get(orders_url, auth=(self.api_secret_key, ''))
+        self.op_logger.info("ORDERS BY ID: " + str(get_orders.status_code) + ', ' + orders_url)
+        self.op_logger.info("ORDERS BY ID CONTENT: " + str(get_orders.text))
 
         if get_orders.status_code == 200:
             orders_collected_list = self.parse_orders(get_orders.content, date_prefix=True)
+
+            self.op_logger.info("ORDERS BY ID LIST: ", str(orders_collected_list))
             
             if orders_collected_list and not isinstance(orders_collected_list, str):
                 return orders_collected_list
@@ -72,6 +90,8 @@ class OrdersPrint(PrestaRequest):
 
 
     def collect_orders_by_date(self, days_ago=0):
+        self.op_logger.info("DAYS AGO: " + str(days_ago))
+
         if days_ago == 0:
             orders_limit_date = date.today()
             orders_url = MAIN_API_URL + 'orders/?filter[date_add]=%[{}]%&date=1'.format(orders_limit_date)            
@@ -356,25 +376,4 @@ class OrdersPrint(PrestaRequest):
 
         return file_name
 
-
-# if __name__ == "__main__":
-#     ord = OrdersPrint(api_secret_key=api_secret_key)
-#     # order_str = ord.collect_orders_by_date(days_ago=1)
-#     # order_str = ord.collect_by_limit_url('3469', '3460')
-#     order_str = ord.collect_by_limit_url('3420', '3482')
-
-#     # print(order_str)
-#     for key, value in order_str.items():
-#         print(key)
-
-#         if isinstance(value, dict):
-#             for phone, o_str in value.items():
-#                 print(phone, o_str)
-            
-#         else:
-#             print(value)
-
-
-#     if order_str:
-#         ord.to_pdf(order_str, ord.total_bikes_to_pickup)
 

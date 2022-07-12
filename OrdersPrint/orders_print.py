@@ -1,11 +1,8 @@
 import sys
 sys.path.insert(0, '..')
-# sys.path.append('/home/palachintosh/projects/mysite/mysite/bikes_monitoring/PrestaRequest/')
-
 
 from mainp.PrestaRequest import PrestaRequest
 from mainp.var import MAIN_API_URL
-#from mainp.api_secret_key import api_secret_key
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import ElementTree
 from fpdf import FPDF
@@ -16,57 +13,38 @@ import logging
 
 import requests
 
-
 class OrdersPrint(PrestaRequest):
-    orders_list = {}
-    not_acceptable_order_states = ['4', '5', '6', '7', '8', '9', '13']
+    orders_list = []
+    not_acceptable_order_states = ['4', '5', '6', '7', '8', '9', '13', '18'] # Right array
     total_bikes_to_pickup = 0
     ev_orders_products = []
 
-
-    formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
-    base_op_dir = os.path.dirname(os.path.abspath(__file__))
-    file_handler = logging.FileHandler(base_op_dir + "/orders_print.log")
-    op_logger = logging.getLogger('stock_worker_log.stock_logger')
-    op_logger.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    op_logger.addHandler(file_handler)
-
-
-    def get_orders_by_date(self, orders_url):
+    def get_orders_by_date(self, orders_url, cur_date):
         get_orders = requests.get(orders_url, auth=(self.api_secret_key, ''))
-        self.op_logger.info(str(get_orders.status_code) + ', ' + orders_url)
-        self.op_logger.info(str(get_orders.content))
 
         if get_orders.status_code == 200:
             orders_collected_list = self.parse_orders(get_orders.content)
-
-            self.op_logger.info("ORDERS BY ID LIST: ", str(orders_collected_list))
             
             if orders_collected_list and not isinstance(orders_collected_list, str):
                 return orders_collected_list
             
             if isinstance(orders_collected_list, str):
-                return orders_collected_list
+                return (cur_date, orders_collected_list)
 
         return None
 
 
-    def get_orders_by_id(self, orders_url) -> dict:
+    def get_orders_by_id(self, orders_url):
         get_orders = requests.get(orders_url, auth=(self.api_secret_key, ''))
-        self.op_logger.info("ORDERS BY ID: " + str(get_orders.status_code) + ', ' + orders_url)
-        self.op_logger.info("ORDERS BY ID CONTENT: " + str(get_orders.text))
 
         if get_orders.status_code == 200:
             orders_collected_list = self.parse_orders(get_orders.content, date_prefix=True)
-
-            self.op_logger.info("ORDERS BY ID LIST: ", str(orders_collected_list))
-            
+        
             if orders_collected_list and not isinstance(orders_collected_list, str):
                 return orders_collected_list
             
             if isinstance(orders_collected_list, str):
-                return orders_collected_list
+                return ('No orders in range.', orders_collected_list)
 
         return None
 
@@ -80,9 +58,24 @@ class OrdersPrint(PrestaRequest):
         
         orders_url = MAIN_API_URL + 'orders/?filter[id]=[{},{}]'.format(limit_id_start, limit_id_end)
         daily_orders = self.get_orders_by_id(orders_url)
-        
+
         if daily_orders is not None:
-            self.orders_list = daily_orders
+            tmp_orders = []
+            c_d = daily_orders[0][0]
+            
+            for order in daily_orders:
+                if isinstance(order, tuple):
+                    if c_d != order[0]:
+                        c_d = order[0]
+                        if tmp_orders:
+                            self.orders_list.append(tmp_orders)
+                            tmp_orders = []
+                    
+                    else:
+                        tmp_orders.append(order)
+            
+            if not self.orders_list and tmp_orders:
+                self.orders_list.append(tmp_orders)
 
             return self.orders_list
 
@@ -90,17 +83,14 @@ class OrdersPrint(PrestaRequest):
 
 
     def collect_orders_by_date(self, days_ago=0):
-        self.op_logger.info("DAYS AGO: " + str(days_ago))
-
         if days_ago == 0:
             orders_limit_date = date.today()
             orders_url = MAIN_API_URL + 'orders/?filter[date_add]=%[{}]%&date=1'.format(orders_limit_date)            
             
-            daily_orders = self.get_orders_by_date(orders_url)
+            daily_orders = self.get_orders_by_date(orders_url, str(orders_limit_date))
 
             if daily_orders is not None:
-                self.orders_list.update({orders_limit_date.strftime('%Y-%m-%d'): daily_orders})
-                
+                self.orders_list.append(daily_orders)
                 return self.orders_list
 
         
@@ -109,10 +99,10 @@ class OrdersPrint(PrestaRequest):
                 limit = date.today() - timedelta(days=day)
                 orders_url = MAIN_API_URL + "orders/?filter[date_add]=%[{}]%&date=1".format(limit)
             
-                daily_orders_list = self.get_orders_by_date(orders_url)
+                daily_orders_list = self.get_orders_by_date(orders_url, str(limit))
 
                 if daily_orders_list is not None:
-                    self.orders_list.update({limit.strftime('%Y-%m-%d'): daily_orders_list})
+                    self.orders_list.append(daily_orders_list)
 
             return self.orders_list
         
@@ -127,6 +117,18 @@ class OrdersPrint(PrestaRequest):
             return main_tag.findall('order')
 
         return None
+
+
+    def product_price_check(self, product_price) -> bool:
+        try:
+            int_product_price = int(product_price.split('.')[0])
+        except:
+            return False
+        
+        if int_product_price > 550:
+            return True
+
+        return False
 
 
     def product_name_validator(self, product_name):
@@ -152,7 +154,10 @@ class OrdersPrint(PrestaRequest):
         except:
             validate_str = ' '.join(str_arr)
 
-        validate_str = ' '.join(str_arr[:size_idex+2:]).rstrip('-').replace(' / ', '/')
+        try:
+            validate_str = ' '.join(str_arr[:size_idex+2:]).rstrip('-').replace(' / ', '/')
+        except:
+            validate_str = product_name
 
         return validate_str
 
@@ -180,7 +185,7 @@ class OrdersPrint(PrestaRequest):
 
 
     def order_status_check(self, order_state):
-        accept = ['2', '3', '11', '12']
+        accept = ['2', '3', '10', '11', '12']
 
         if order_state in accept:
             return ''
@@ -210,7 +215,7 @@ class OrdersPrint(PrestaRequest):
         pickup_in_shop = self.pickup_check(xml_content[0].find('id_carrier').text)
         date_add = datetime.strptime(
             xml_content[0].find('date_add').text, '%Y-%m-%d %H:%M:%S').date().strftime('%Y-%m-%d')
-
+        product_price = order_row[0].find('product_price').text
 
         info_set = {
             'xml_content': xml_content,
@@ -219,14 +224,15 @@ class OrdersPrint(PrestaRequest):
             'order_state_id': order_state_id,
             'final_state': final_state,
             'pickup_in_shop': pickup_in_shop,
-            'date_add': date_add
+            'date_add': date_add,
+            'product_price': product_price
             }
 
         return info_set
 
 
     def make_printable_str(self, order_id):
-        order_list_line = {}
+        order_list_line = None
         order_info = self.get_order_detail(order_id)
 
         if order_info is None:
@@ -237,9 +243,10 @@ class OrdersPrint(PrestaRequest):
 
         for row in order_info['order_row']:
             product_name = self.product_name_validator(row.find('product_name').text)
+            is_bike = self.product_price_check(order_info['product_price'])
             quantity = row.find('product_quantity').text
 
-            if product_name is not None:
+            if product_name is not None and is_bike:
                 p_num = self.order_phone_number(order_info['order_address_id'])
                 final_str = str(order_id) + '  | ' + product_name
                 
@@ -256,39 +263,16 @@ class OrdersPrint(PrestaRequest):
                 
                 self.ev_orders_products.append(final_str)
 
-                if order_list_line.get(order_info['date_add']) is None:
-                    order_list_line.update({order_info['date_add']: {p_num: self.ev_orders_products}})
-                # else:
-                #     order_list_line.get(order_info['date_add']).update({'x2': self.ev_orders_products})
-
-        self.ev_orders_products = []
+        if self.ev_orders_products:
+            order_list_line = self.ev_orders_products
+            order_list_line = (order_info['date_add'], p_num, self.ev_orders_products)
+            self.ev_orders_products = []
 
         return order_list_line
     
 
-    def make_with_prefix(self, start_str, daily_orders, date_prefix=False):
-        start_keys = list(start_str.keys())[0]
-
-        if date_prefix:
-            if daily_orders:
-                get_date = daily_orders.get(start_keys)
-
-                if get_date is None:
-                    return start_str
-
-                else:
-                    daily_orders.get(start_keys).update(start_str.get(start_keys))
-                    return daily_orders
-                    
-            return start_str
-        
-        else:
-            return start_str.get(start_keys)
-
-
-
     def parse_orders(self, content, date_prefix=False):
-        daily_orders = {}
+        daily_orders = []
 
         orders_tree  = self.visible_orders(content)
         if orders_tree is None:
@@ -296,31 +280,39 @@ class OrdersPrint(PrestaRequest):
 
         for order in orders_tree:
             start_str = self.make_printable_str(order.attrib['id'])
-            
-            if start_str and start_str is not None:
-                # daily_orders.append(start_str)
-                if date_prefix:
-                    daily_orders.update(
-                        self.make_with_prefix(start_str, daily_orders, date_prefix))
-                    # daily_orders = self.make_with_prefix(start_str, daily_orders, date_prefix)
-                else:
-                    daily_orders.update(
-                        self.make_with_prefix(start_str, daily_orders)
-                    )
 
-        return daily_orders
+            if start_str and start_str is not None:
+                index = 0
+                if daily_orders:
+                    for order_line in daily_orders:
+                        if start_str[1] in order_line:
+                            daily_orders[index] = start_str
+                            break
+                            
+                        if index == len(daily_orders) - 1:
+                            daily_orders.append(start_str)
+
+                        index += 1
+                else:
+                    daily_orders.append(start_str)
+
+        if daily_orders:
+            return daily_orders
+
+        return "No orders today :)"
 
 
     def _orders_counter(self, orders_dict):
         counter = 0
 
-        for key, line in orders_dict.items():
-            if isinstance(line, dict):
-                for phone, order in line.items():
-                    for final_line in order:
+        for daily_orders in orders_dict:
+            if isinstance(daily_orders, list):
+                for order in daily_orders:
+                    for final_line in order[2]:
                         counter += 1
-        
+
         return counter
+
 
     def to_pdf(self, orders_dict, total=0, date=date.today().strftime('%Y/%m/%d'), card_path=None):
         file_name = None
@@ -339,7 +331,8 @@ class OrdersPrint(PrestaRequest):
         if card_path is None:
             file_name = 'orders-{}.pdf'.format(datetime.today().date())
             card_path = os.path.join(self.base_dir, 'print/' + file_name)
-    
+
+
         class PDF(FPDF):
             def header(self):
                 self.set_font('Arial', 'B', 12)
@@ -351,29 +344,20 @@ class OrdersPrint(PrestaRequest):
 
         pdf = PDF('P', 'pt', 'A4')
         pdf.add_page()
-        pdf.add_font(
-            'DejaVu',
-            '', 
-            os.path.join(self.base_dir, 'OrdersPrint/DejaVuSans.ttf'),
-            uni=True)
-        
+        pdf.add_font('DejaVu', '', 'DejaVuSans.ttf', uni=True)
         pdf.set_font('DejaVu', '', 10)
 
-        for key, line in orders_dict.items():
-            pdf.cell(0, 20, key, 0, 1)
-
-            if isinstance(line, dict):
-                for phone, order in line.items():
-                    # print(phone, o_str)
-                    for final_line in order:
+        for daily_orders in orders_dict:
+            if isinstance(daily_orders, list):
+                pdf.cell(0, 20, daily_orders[0][0], 0, 1)
+                for order in daily_orders:
+                    for final_line in order[2]:
                         pdf.cell(0, 20, final_line, 0, 1)
-                
+
             else:
-                pdf.cell(0, 20, line, 0, 1)
-        
-        # pdf.output('orders.pdf', 'F')
+                pdf.cell(0, 20, daily_orders[0], 0, 1)
+                pdf.cell(0, 20, daily_orders[1], 0, 1)
+                
         pdf.output(card_path, 'F')
 
         return file_name
-
-

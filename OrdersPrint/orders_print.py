@@ -331,7 +331,7 @@ class OrdersPrint(PrestaRequest):
         if card_path is None:
             file_name = 'orders-{}.pdf'.format(datetime.today().date())
             card_path = os.path.join(self.base_dir, 'print/' + file_name)
-
+    
 
         class PDF(FPDF):
             def header(self):
@@ -344,7 +344,12 @@ class OrdersPrint(PrestaRequest):
 
         pdf = PDF('P', 'pt', 'A4')
         pdf.add_page()
-        pdf.add_font('DejaVu', '', 'DejaVuSans.ttf', uni=True)
+        pdf.add_font(
+            'DejaVu',
+            '', 
+            os.path.join(self.base_dir, 'OrdersPrint/DejaVuSans.ttf'),
+            uni=True)
+
         pdf.set_font('DejaVu', '', 10)
 
         for daily_orders in orders_dict:

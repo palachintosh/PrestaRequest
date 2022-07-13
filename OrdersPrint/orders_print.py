@@ -19,8 +19,20 @@ class OrdersPrint(PrestaRequest):
     total_bikes_to_pickup = 0
     ev_orders_products = []
 
+    formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
+    base_op_dir = os.path.dirname(os.path.abspath(__file__))
+    file_handler = logging.FileHandler(base_op_dir + "/orders_print.log")
+    op_logger = logging.getLogger('stock_worker_log.stock_logger')
+    op_logger.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    op_logger.addHandler(file_handler)
+
+
     def get_orders_by_date(self, orders_url, cur_date):
         get_orders = requests.get(orders_url, auth=(self.api_secret_key, ''))
+
+        self.op_logger.info(str(get_orders.status_code) + ', ' + orders_url)
+        self.op_logger.info(str(get_orders.content))
 
         if get_orders.status_code == 200:
             orders_collected_list = self.parse_orders(get_orders.content)
@@ -36,6 +48,10 @@ class OrdersPrint(PrestaRequest):
 
     def get_orders_by_id(self, orders_url):
         get_orders = requests.get(orders_url, auth=(self.api_secret_key, ''))
+
+        self.op_logger.info(str(get_orders.status_code) + ', ' + orders_url)
+        self.op_logger.info(str(get_orders.content))
+
 
         if get_orders.status_code == 200:
             orders_collected_list = self.parse_orders(get_orders.content, date_prefix=True)
@@ -235,6 +251,8 @@ class OrdersPrint(PrestaRequest):
         order_list_line = None
         order_info = self.get_order_detail(order_id)
 
+        self.op_logger.info(str("ORDER INFO: " + order_info) + ', ' + order_id)
+
         if order_info is None:
             return None
         
@@ -248,6 +266,8 @@ class OrdersPrint(PrestaRequest):
 
             if product_name is not None and is_bike:
                 p_num = self.order_phone_number(order_info['order_address_id'])
+                self.op_logger.info("P NUM: " + str(p_num) + ', ' + str(order_info['order_address_id']))
+
                 final_str = str(order_id) + '  | ' + product_name
                 
                 if quantity != '1':
@@ -262,6 +282,9 @@ class OrdersPrint(PrestaRequest):
                     final_str = final_str + ' | ' + order_info['final_state']
                 
                 self.ev_orders_products.append(final_str)
+
+        self.op_logger.info("AFTER FORMING: " + str(order_id) + ', ' + order_info['order_address_id'])
+
 
         if self.ev_orders_products:
             order_list_line = self.ev_orders_products

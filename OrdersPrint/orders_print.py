@@ -251,7 +251,7 @@ class OrdersPrint(PrestaRequest):
         order_list_line = None
         order_info = self.get_order_detail(order_id)
 
-        self.op_logger.info(str("ORDER INFO: " + order_info) + ', ' + order_id)
+        self.op_logger.info(str("ORDER INFO: ") + order_id)
 
         if order_info is None:
             return None
@@ -283,7 +283,7 @@ class OrdersPrint(PrestaRequest):
                 
                 self.ev_orders_products.append(final_str)
 
-        self.op_logger.info("AFTER FORMING: " + str(order_id) + ', ' + order_info['order_address_id'])
+        self.op_logger.info("AFTER FORMING: " + str(order_id) + ', ' + str(order_info['order_address_id']))
 
 
         if self.ev_orders_products:

@@ -284,10 +284,13 @@ class OrdersPrint(PrestaRequest):
                 self.ev_orders_products.append(final_str)
 
         self.op_logger.info("AFTER FORMING: " + str(order_id) + ', ' + str(order_info['order_address_id']))
+        self.op_logger.info("AFTER FORMING:" + "-----------------------------")
+        self.op_logger.info("AFTER FORMING: " + str(order_info['order_row']))
+
 
 
         if self.ev_orders_products:
-            order_list_line = self.ev_orders_products
+            # order_list_line = self.ev_orders_products
             order_list_line = (order_info['date_add'], p_num, self.ev_orders_products)
         
         self.ev_orders_products = []

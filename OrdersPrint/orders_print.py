@@ -304,6 +304,9 @@ class OrdersPrint(PrestaRequest):
         for order in orders_tree:
             start_str = self.make_printable_str(order.attrib['id'])
 
+            self.op_logger.info(str("PRINTABLE STR: ") + str(start_str))
+
+
             if start_str and start_str is not None:
                 index = 0
                 if daily_orders:
@@ -320,6 +323,8 @@ class OrdersPrint(PrestaRequest):
                     daily_orders.append(start_str)
 
         if daily_orders:
+            self.op_logger.info(str("DAILY ORDERS: ") + str(daily_orders))
+
             return daily_orders
 
         return "No orders today :)"

@@ -248,6 +248,8 @@ class OrdersPrint(PrestaRequest):
 
 
     def make_printable_str(self, order_id):
+        self.ev_orders_products = []
+
         order_list_line = None
         order_info = self.get_order_detail(order_id)
 
@@ -293,7 +295,7 @@ class OrdersPrint(PrestaRequest):
             # order_list_line = self.ev_orders_products
             order_list_line = (order_info['date_add'], p_num, self.ev_orders_products)
         
-        self.ev_orders_products = []
+        # self.ev_orders_products = []
 
         return order_list_line
     

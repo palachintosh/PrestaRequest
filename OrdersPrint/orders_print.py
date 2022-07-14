@@ -285,7 +285,7 @@ class OrdersPrint(PrestaRequest):
 
         self.op_logger.info("AFTER FORMING: " + str(order_id) + ', ' + str(order_info['order_address_id']))
         self.op_logger.info("AFTER FORMING:" + "-----------------------------")
-        self.op_logger.info("AFTER FORMING: " + str(order_info['order_row']))
+        self.op_logger.info("ORDER ROW LEN: " + str(len(order_info['order_row'])))
 
 
 

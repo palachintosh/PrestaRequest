@@ -72,6 +72,8 @@ class OrdersPrint(PrestaRequest):
         except:
             return None
         
+        self.orders_list = []
+
         orders_url = MAIN_API_URL + 'orders/?filter[id]=[{},{}]'.format(limit_id_start, limit_id_end)
         daily_orders = self.get_orders_by_id(orders_url)
 
@@ -93,12 +95,17 @@ class OrdersPrint(PrestaRequest):
             if not self.orders_list and tmp_orders:
                 self.orders_list.append(tmp_orders)
 
+            self.op_logger.info("FINAL ORDERS LIST: -------------------------")
+            self.op_logger.info(str(self.orders_list))
+
             return self.orders_list
 
         return None
 
 
     def collect_orders_by_date(self, days_ago=0):
+        self.orders_list = []
+
         if days_ago == 0:
             orders_limit_date = date.today()
             orders_url = MAIN_API_URL + 'orders/?filter[date_add]=%[{}]%&date=1'.format(orders_limit_date)            
@@ -107,6 +114,10 @@ class OrdersPrint(PrestaRequest):
 
             if daily_orders is not None:
                 self.orders_list.append(daily_orders)
+
+                self.op_logger.info("FINAL ORDERS LIST BY DATE: -------------------------")
+                self.op_logger.info(str(self.orders_list))
+
                 return self.orders_list
 
         
@@ -119,6 +130,9 @@ class OrdersPrint(PrestaRequest):
 
                 if daily_orders_list is not None:
                     self.orders_list.append(daily_orders_list)
+
+            self.op_logger.info("FINAL ORDERS LIST BY DATE: -------------------------")
+            self.op_logger.info(str(self.orders_list))
 
             return self.orders_list
         

@@ -9,8 +9,6 @@ from fpdf import FPDF
 from datetime import date, timedelta, datetime
 import os
 
-import logging
-
 import requests
 
 class OrdersPrint(PrestaRequest):
@@ -19,20 +17,9 @@ class OrdersPrint(PrestaRequest):
     total_bikes_to_pickup = 0
     ev_orders_products = []
 
-    formatter = logging.Formatter("%(levelname)s: %(asctime)s - %(message)s")
-    base_op_dir = os.path.dirname(os.path.abspath(__file__))
-    file_handler = logging.FileHandler(base_op_dir + "/orders_print.log")
-    op_logger = logging.getLogger('stock_worker_log.stock_logger')
-    op_logger.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    op_logger.addHandler(file_handler)
-
 
     def get_orders_by_date(self, orders_url, cur_date):
         get_orders = requests.get(orders_url, auth=(self.api_secret_key, ''))
-
-        self.op_logger.info(str(get_orders.status_code) + ', ' + orders_url)
-        self.op_logger.info(str(get_orders.content))
 
         if get_orders.status_code == 200:
             orders_collected_list = self.parse_orders(get_orders.content)
@@ -46,12 +33,8 @@ class OrdersPrint(PrestaRequest):
         return None
 
 
-    def get_orders_by_id(self, orders_url):
+    def get_orders_by_id(self, orders_url, min='0', max='0'):
         get_orders = requests.get(orders_url, auth=(self.api_secret_key, ''))
-
-        self.op_logger.info(str(get_orders.status_code) + ', ' + orders_url)
-        self.op_logger.info(str(get_orders.content))
-
 
         if get_orders.status_code == 200:
             orders_collected_list = self.parse_orders(get_orders.content, date_prefix=True)
@@ -60,22 +43,26 @@ class OrdersPrint(PrestaRequest):
                 return orders_collected_list
             
             if isinstance(orders_collected_list, str):
-                return ('No orders in range.', orders_collected_list)
+                return ('No orders in range: {} -> {}'.format(min, max), orders_collected_list)
 
         return None
 
 
     def collect_by_limit_url(self, limit_id_start, limit_id_end):
         try:
-            int(limit_id_start)
-            int(limit_id_end)
+            min_id = int(limit_id_start)
+            max_id = int(limit_id_end)
+
+            if min_id > max_id:
+                limit_id_start, limit_id_end = limit_id_end, limit_id_start
+
         except:
             return None
         
         self.orders_list = []
 
         orders_url = MAIN_API_URL + 'orders/?filter[id]=[{},{}]'.format(limit_id_start, limit_id_end)
-        daily_orders = self.get_orders_by_id(orders_url)
+        daily_orders = self.get_orders_by_id(orders_url, limit_id_start, limit_id_end)
 
         if daily_orders is not None:
             tmp_orders = []
@@ -94,12 +81,12 @@ class OrdersPrint(PrestaRequest):
             
             if not self.orders_list and tmp_orders:
                 self.orders_list.append(tmp_orders)
-
-            self.op_logger.info("FINAL ORDERS LIST: -------------------------")
-            self.op_logger.info(str(self.orders_list))
-
-            return self.orders_list
-
+            
+            else:
+                self.orders_list.append(daily_orders)
+                
+            return self.orders_list 
+                
         return None
 
 
@@ -115,9 +102,6 @@ class OrdersPrint(PrestaRequest):
             if daily_orders is not None:
                 self.orders_list.append(daily_orders)
 
-                self.op_logger.info("FINAL ORDERS LIST BY DATE: -------------------------")
-                self.op_logger.info(str(self.orders_list))
-
                 return self.orders_list
 
         
@@ -130,9 +114,6 @@ class OrdersPrint(PrestaRequest):
 
                 if daily_orders_list is not None:
                     self.orders_list.append(daily_orders_list)
-
-            self.op_logger.info("FINAL ORDERS LIST BY DATE: -------------------------")
-            self.op_logger.info(str(self.orders_list))
 
             return self.orders_list
         
@@ -267,8 +248,6 @@ class OrdersPrint(PrestaRequest):
         order_list_line = None
         order_info = self.get_order_detail(order_id)
 
-        self.op_logger.info(str("ORDER INFO: ") + order_id)
-
         if order_info is None:
             return None
         
@@ -282,8 +261,6 @@ class OrdersPrint(PrestaRequest):
 
             if product_name is not None and is_bike:
                 p_num = self.order_phone_number(order_info['order_address_id'])
-                self.op_logger.info("P NUM: " + str(p_num) + ', ' + str(order_info['order_address_id']))
-
                 final_str = str(order_id) + '  | ' + product_name
                 
                 if quantity != '1':
@@ -299,18 +276,10 @@ class OrdersPrint(PrestaRequest):
                 
                 self.ev_orders_products.append(final_str)
 
-        self.op_logger.info("AFTER FORMING: " + str(order_id) + ', ' + str(order_info['order_address_id']))
-        self.op_logger.info("AFTER FORMING:" + "-----------------------------")
-        self.op_logger.info("ORDER ROW LEN: " + str(len(order_info['order_row'])))
-
-
 
         if self.ev_orders_products:
-            # order_list_line = self.ev_orders_products
             order_list_line = (order_info['date_add'], p_num, self.ev_orders_products)
         
-        # self.ev_orders_products = []
-
         return order_list_line
     
 
@@ -323,9 +292,6 @@ class OrdersPrint(PrestaRequest):
 
         for order in orders_tree:
             start_str = self.make_printable_str(order.attrib['id'])
-
-            self.op_logger.info(str("PRINTABLE STR: ") + str(start_str))
-
 
             if start_str and start_str is not None:
                 index = 0
@@ -343,8 +309,6 @@ class OrdersPrint(PrestaRequest):
                     daily_orders.append(start_str)
 
         if daily_orders:
-            self.op_logger.info(str("DAILY ORDERS: ") + str(daily_orders))
-
             return daily_orders
 
         return "No orders today :)"

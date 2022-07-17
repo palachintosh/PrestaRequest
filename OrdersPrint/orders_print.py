@@ -75,16 +75,17 @@ class OrdersPrint(PrestaRequest):
                         if tmp_orders:
                             self.orders_list.append(tmp_orders)
                             tmp_orders = []
-                    
+                            tmp_orders.append(order)
+
                     else:
                         tmp_orders.append(order)
-            
-            if not self.orders_list and tmp_orders:
+
+            if tmp_orders:
                 self.orders_list.append(tmp_orders)
             
-            else:
+            if not self.orders_list:
                 self.orders_list.append(daily_orders)
-                
+
             return self.orders_list 
                 
         return None
@@ -196,7 +197,7 @@ class OrdersPrint(PrestaRequest):
 
 
     def order_status_check(self, order_state):
-        accept = ['2', '3', '10', '11', '12']
+        accept = ['2', '3', '11', '12']
 
         if order_state in accept:
             return ''
